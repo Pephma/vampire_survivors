@@ -1,4 +1,3 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/eBBq1CaW)
-# TP2: Asteroids
+# Vampire Survivors
 
-Instruções: [https://lucasnfe.github.io/dcc192-2025-2/avaliacoes/tp2-asteroids]([https://lucasnfe.github.io/dcc192-2025-2/avaliacoes/tp2-asteroids](https://lucasnfe.github.io/dcc192-2025-2/avaliacoes/tp2-asteroids))
+A Vampire Survivors-like game built with C++ and OpenGL.

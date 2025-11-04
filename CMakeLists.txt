@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.26)
 set(CMAKE_CXX_STANDARD 17)
 
 # Configurando o nome e executável do projeto
-set(PROJECT_NAME "tp2-asteroids")
+set(PROJECT_NAME "vampire-survivors")
 project(${PROJECT_NAME})
 
 # Try to find packages
@@ -100,7 +100,7 @@ else()
     )
 endif()
 
-target_include_directories(tp2-asteroids PRIVATE
+target_include_directories(${PROJECT_NAME} PRIVATE
         "C:/vcpkg/installed/x64-windows/include"
         "C:/Program Files/SDL2/include"
 )
