@@ -13,10 +13,6 @@ MainMenu::MainMenu(Game* game)
     startItem.position = Vector2(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f - 100.0f, static_cast<float>(Game::WINDOW_HEIGHT) / 2.0f);
     startItem.size = Vector2(200.0f, 40.0f);
     startItem.onSelect = [this]() {
-        if (mGame->GetAudioSystem())
-        {
-            mGame->GetAudioSystem()->StopMusic();
-        }
         mGame->StartNewGame();
     };
     mMenuItems.push_back(startItem);
@@ -37,7 +33,7 @@ void MainMenu::Draw(Renderer* renderer)
     {
         if (!mGame->GetAudioSystem()->IsMusicPlaying())
         {
-            mGame->GetAudioSystem()->PlayMusic(-1);
+            mGame->GetAudioSystem()->PlayMusic("menu", -1);
             mMusicStarted = true;
         }
     }

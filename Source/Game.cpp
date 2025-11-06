@@ -76,16 +76,8 @@ bool Game::Initialize()
     mPauseMenu = new PauseMenu(this);
     mUpgradeMenu = new UpgradeMenu(this);
 
-    std::string musicPath = "Assets/Music/twd_theme.mp3";
-    if (!mAudioSystem->LoadMusic(musicPath))
-    {
-        musicPath = "../Assets/Music/twd_theme.mp3";
-        if (!mAudioSystem->LoadMusic(musicPath))
-        {
-            musicPath = "../../Assets/Music/twd_theme.mp3";
-            mAudioSystem->LoadMusic(musicPath);
-        }
-    }
+    mAudioSystem->LoadMusic("menu", "Assets/Music/twd_theme.mp3");
+    mAudioSystem->LoadMusic("gameplay", "Assets/Music/gameplay_music.mp3");
 
     mTicksCount = SDL_GetTicks();
 
@@ -258,6 +250,7 @@ void Game::StartNewGame()
     if (mAudioSystem)
     {
         mAudioSystem->StopMusic();
+        mAudioSystem->PlayMusic("gameplay", -1);
     }
     CleanupGame();
     InitializeActors();
@@ -274,6 +267,10 @@ void Game::ResumeGame()
     if (mGameState == MenuState::Paused || mGameState == MenuState::UpgradeMenu)
     {
         mGameState = MenuState::Playing;
+        if (mAudioSystem)
+        {
+            mAudioSystem->ResumeMusic();
+        }
     }
 }
 
@@ -282,6 +279,10 @@ void Game::PauseGame()
     if (mGameState == MenuState::Playing)
     {
         mGameState = MenuState::Paused;
+        if (mAudioSystem)
+        {
+            mAudioSystem->PauseMusic();
+        }
     }
 }
 
@@ -291,7 +292,8 @@ void Game::QuitToMenu()
     mGameState = MenuState::MainMenu;
     if (mAudioSystem)
     {
-        mAudioSystem->PlayMusic(-1);
+        mAudioSystem->StopMusic();
+        mAudioSystem->PlayMusic("menu", -1);
     }
 }
 

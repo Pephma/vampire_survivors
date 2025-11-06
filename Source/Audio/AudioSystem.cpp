@@ -3,7 +3,7 @@
 #include <SDL_log.h>
 
 AudioSystem::AudioSystem()
-    : mMusic(nullptr)
+    : mCurrentMusic(nullptr)
     , mInitialized(false)
 {
 }
@@ -27,11 +27,15 @@ bool AudioSystem::Initialize()
 
 void AudioSystem::Shutdown()
 {
-    if (mMusic)
+    for (auto& pair : mMusicMap)
     {
-        Mix_FreeMusic(mMusic);
-        mMusic = nullptr;
+        if (pair.second)
+        {
+            Mix_FreeMusic(pair.second);
+        }
     }
+    mMusicMap.clear();
+    mCurrentMusic = nullptr;
 
     if (mInitialized)
     {
@@ -40,31 +44,49 @@ void AudioSystem::Shutdown()
     }
 }
 
-bool AudioSystem::LoadMusic(const std::string& fileName)
+bool AudioSystem::LoadMusic(const std::string& name, const std::string& fileName)
 {
-    if (mMusic)
+    if (mMusicMap.find(name) != mMusicMap.end())
     {
-        Mix_FreeMusic(mMusic);
-        mMusic = nullptr;
+        Mix_FreeMusic(mMusicMap[name]);
     }
 
-    mMusic = Mix_LoadMUS(fileName.c_str());
-    if (mMusic == nullptr)
+    std::string paths[] = {fileName, "../" + fileName, "../../" + fileName};
+    Mix_Music* music = nullptr;
+
+    for (const auto& path : paths)
     {
-        SDL_Log("Failed to load music! SDL_mixer Error: %s\n", Mix_GetError());
+        music = Mix_LoadMUS(path.c_str());
+        if (music != nullptr)
+        {
+            break;
+        }
+    }
+
+    if (music == nullptr)
+    {
+        SDL_Log("Failed to load music %s! SDL_mixer Error: %s\n", fileName.c_str(), Mix_GetError());
         return false;
     }
 
+    mMusicMap[name] = music;
     return true;
 }
 
-void AudioSystem::PlayMusic(int loops)
+void AudioSystem::PlayMusic(const std::string& name, int loops)
 {
-    if (mMusic)
+    auto it = mMusicMap.find(name);
+    if (it != mMusicMap.end())
     {
+        mCurrentMusic = it->second;
         if (Mix_PlayingMusic() == 0)
         {
-            Mix_PlayMusic(mMusic, loops);
+            Mix_PlayMusic(mCurrentMusic, loops);
+        }
+        else
+        {
+            Mix_HaltMusic();
+            Mix_PlayMusic(mCurrentMusic, loops);
         }
     }
 }
