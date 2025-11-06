@@ -6,6 +6,7 @@
 #include <SDL.h>
 #include <vector>
 #include "Renderer/Renderer.h"
+#include "Audio/AudioSystem.h"
 
 enum class MenuState
 {
@@ -33,6 +34,7 @@ public:
     void RemoveActor(class Actor* actor);
 
     class Renderer* GetRenderer() { return mRenderer; }
+    AudioSystem* GetAudioSystem() { return mAudioSystem; }
 
     static const int WINDOW_WIDTH = 1024;
     static const int WINDOW_HEIGHT = 768;
@@ -100,6 +102,7 @@ private:
     // SDL stuff
     SDL_Window* mWindow;
     class Renderer* mRenderer;
+    AudioSystem* mAudioSystem;
 
     // Track elapsed time since game start
     Uint32 mTicksCount;

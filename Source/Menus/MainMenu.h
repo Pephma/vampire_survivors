@@ -6,5 +6,8 @@ class MainMenu : public Menu
 public:
     MainMenu(class Game* game);
     void Draw(class Renderer* renderer) override;
+
+private:
+    bool mMusicStarted;
 };
 
