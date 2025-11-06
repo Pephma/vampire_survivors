@@ -22,6 +22,7 @@
 Game::Game()
         :mWindow(nullptr)
         ,mRenderer(nullptr)
+        ,mAudioSystem(nullptr)
         ,mTicksCount(0)
         ,mIsRunning(true)
         ,mIsDebugging(false)
@@ -47,9 +48,16 @@ bool Game::Initialize()
 {
     Random::Init();
 
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
     {
         SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
+        return false;
+    }
+
+    mAudioSystem = new AudioSystem();
+    if (!mAudioSystem->Initialize())
+    {
+        SDL_Log("Failed to initialize audio system");
         return false;
     }
 
@@ -67,6 +75,9 @@ bool Game::Initialize()
     mMainMenu = new MainMenu(this);
     mPauseMenu = new PauseMenu(this);
     mUpgradeMenu = new UpgradeMenu(this);
+
+    mAudioSystem->LoadMusic("menu", "Assets/Music/twd_theme.mp3");
+    mAudioSystem->LoadMusic("gameplay", "Assets/Music/gameplay_music.mp3");
 
     mTicksCount = SDL_GetTicks();
 
@@ -236,6 +247,11 @@ void Game::SpawnProjectile(const Vector2& position, const Vector2& direction, fl
 
 void Game::StartNewGame()
 {
+    if (mAudioSystem)
+    {
+        mAudioSystem->StopMusic();
+        mAudioSystem->PlayMusic("gameplay", -1);
+    }
     CleanupGame();
     InitializeActors();
     mGameState = MenuState::Playing;
@@ -251,6 +267,10 @@ void Game::ResumeGame()
     if (mGameState == MenuState::Paused || mGameState == MenuState::UpgradeMenu)
     {
         mGameState = MenuState::Playing;
+        if (mAudioSystem)
+        {
+            mAudioSystem->ResumeMusic();
+        }
     }
 }
 
@@ -259,6 +279,10 @@ void Game::PauseGame()
     if (mGameState == MenuState::Playing)
     {
         mGameState = MenuState::Paused;
+        if (mAudioSystem)
+        {
+            mAudioSystem->PauseMusic();
+        }
     }
 }
 
@@ -266,6 +290,11 @@ void Game::QuitToMenu()
 {
     CleanupGame();
     mGameState = MenuState::MainMenu;
+    if (mAudioSystem)
+    {
+        mAudioSystem->StopMusic();
+        mAudioSystem->PlayMusic("menu", -1);
+    }
 }
 
 void Game::GameOver()
@@ -682,6 +711,13 @@ void Game::Shutdown()
     delete mMainMenu;
     delete mPauseMenu;
     delete mUpgradeMenu;
+
+    if (mAudioSystem)
+    {
+        mAudioSystem->Shutdown();
+        delete mAudioSystem;
+        mAudioSystem = nullptr;
+    }
 
     mRenderer->Shutdown();
     delete mRenderer;

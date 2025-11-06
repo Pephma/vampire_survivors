@@ -6,6 +6,7 @@
 
 MainMenu::MainMenu(Game* game)
     : Menu(game)
+    , mMusicStarted(false)
 {
     MenuItem startItem;
     startItem.text = "Start Game";
@@ -28,9 +29,17 @@ MainMenu::MainMenu(Game* game)
 
 void MainMenu::Draw(Renderer* renderer)
 {
+    if (mGame->GetAudioSystem())
+    {
+        if (!mGame->GetAudioSystem()->IsMusicPlaying())
+        {
+            mGame->GetAudioSystem()->PlayMusic("menu", -1);
+            mMusicStarted = true;
+        }
+    }
+
     Menu::Draw(renderer);
     
-    // Draw title
     std::vector<Vector2> titleBg;
     titleBg.emplace_back(Vector2(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f - 150.0f, 100.0f));
     titleBg.emplace_back(Vector2(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f + 150.0f, 100.0f));

@@ -9,6 +9,7 @@ project(${PROJECT_NAME})
 # Try to find packages
 find_package(SDL2 2.32.2 EXACT REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(SDL2_mixer REQUIRED)
 
 # Try to find GLEW, but don't fail if not found - we'll handle it manually
 find_package(GLEW QUIET)
@@ -78,6 +79,8 @@ add_executable(${PROJECT_NAME}
         Source/Menus/PauseMenu.h
         Source/Menus/UpgradeMenu.cpp
         Source/Menus/UpgradeMenu.h
+        Source/Audio/AudioSystem.cpp
+        Source/Audio/AudioSystem.h
 )
 
 # Link libraries
@@ -86,21 +89,18 @@ if(GLEW_FOUND)
             GLEW::GLEW
             SDL2::SDL2main
             SDL2::SDL2
-            opengl32
+            SDL2_mixer::SDL2_mixer
+            OpenGL::GL
     )
 else()
     target_link_libraries(${PROJECT_NAME} PRIVATE
             ${GLEW_LIBRARIES}
             SDL2::SDL2main
             SDL2::SDL2
-            opengl32
+            SDL2_mixer::SDL2_mixer
+            OpenGL::GL
     )
     target_include_directories(${PROJECT_NAME} PRIVATE
             ${GLEW_INCLUDE_DIRS}
     )
 endif()
-
-target_include_directories(${PROJECT_NAME} PRIVATE
-        "C:/vcpkg/installed/x64-windows/include"
-        "C:/Program Files/SDL2/include"
-)
