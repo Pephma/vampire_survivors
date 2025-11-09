@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include <limits> // std::numeric_limits<float>::infinity()
+
 #include "Game.h"
 #include "Actors/Player.h"
 #include "Actors/Enemy.h"
@@ -20,28 +22,30 @@
 #include "Random.h"
 
 Game::Game()
-        :mWindow(nullptr)
-        ,mRenderer(nullptr)
-        ,mAudioSystem(nullptr)
-        ,mTicksCount(0)
-        ,mIsRunning(true)
-        ,mIsDebugging(false)
-        ,mUpdatingActors(false)
-        ,mGameState(MenuState::MainMenu)
-        ,mMainMenu(nullptr)
-        ,mPauseMenu(nullptr)
-        ,mUpgradeMenu(nullptr)
-        ,mPlayer(nullptr)
-        ,mCurrentWave(1)
-        ,mWaveTimer(0.0f)
-        ,mNextWaveTimer(5.0f)
-        ,mEnemiesSpawned(0)
-        ,mEnemiesToSpawn(10)
-        ,mCameraPosition(Vector2::Zero)
-        ,mScreenShakeAmount(0.0f)
-        ,mScreenShakeDuration(0.0f)
+        : mWindow(nullptr)
+        , mRenderer(nullptr)
+        , mAudioSystem(nullptr)
+        , mTicksCount(0)
+        , mIsRunning(true)
+        , mIsDebugging(false)
+        , mUpdatingActors(false)
+        , mGameState(MenuState::MainMenu)
+        , mMainMenu(nullptr)
+        , mPauseMenu(nullptr)
+        , mUpgradeMenu(nullptr)
+        , mPlayer(nullptr)
+        , mCurrentWave(1)
+        , mWaveTimer(0.0f)
+        , mNextWaveTimer(5.0f)
+        , mEnemiesSpawned(0)
+        , mEnemiesToSpawn(10)
+        , mElapsedSeconds(0.0f)
+        , mBoss5Spawned(false)
+        , mBoss10Spawned(false)
+        , mCameraPosition(Vector2::Zero)
+        , mScreenShakeAmount(0.0f)
+        , mScreenShakeDuration(0.0f)
 {
-
 }
 
 bool Game::Initialize()
@@ -72,7 +76,7 @@ bool Game::Initialize()
     mRenderer->Initialize(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     // Initialize menus
-    mMainMenu = new MainMenu(this);
+    mMainMenu  = new MainMenu(this);
     mPauseMenu = new PauseMenu(this);
     mUpgradeMenu = new UpgradeMenu(this);
 
@@ -136,11 +140,11 @@ void Game::ProcessInput()
         {
             PauseGame();
         }
-        
+
         // Process actor input
-    for (auto actor : mActors)
-    {
-        actor->ProcessInput(state);
+        for (auto actor : mActors)
+        {
+            actor->ProcessInput(state);
         }
     }
 }
@@ -159,7 +163,7 @@ void Game::UpdateGame()
 
     if (mGameState == MenuState::Playing)
     {
-    UpdateActors(deltaTime);
+        UpdateActors(deltaTime);
         UpdateWaveSystem(deltaTime);
         UpdateCamera(deltaTime);
     }
@@ -167,25 +171,19 @@ void Game::UpdateGame()
 
 void Game::UpdateActors(float deltaTime)
 {
-
     mUpdatingActors = true;
-    
 
     for (auto actor : mActors)
     {
         actor->Update(deltaTime);
-        
-        // Clean up particles that are too far from camera
+
+        // (Opcional) limpeza de partículas longe da câmera
         Vector2 actorPos = actor->GetPosition();
         Vector2 cameraPos = mCameraPosition;
         float distance = Vector2::Distance(actorPos, cameraPos);
-        
-        // Destroy particles that are far away (assuming they're temporary particles)
         if (distance > 1000.0f && actor->GetState() == ActorState::Active)
         {
-            // Check if it's a particle (has DrawComponent but no other identifying features)
-            // For now, just clean up actors far from camera after a delay
-            // This is a simple cleanup mechanism
+            // heurística de limpeza — mantido como no original
         }
     }
 
@@ -260,6 +258,11 @@ void Game::StartNewGame()
     mNextWaveTimer = 5.0f;
     mEnemiesSpawned = 0;
     mEnemiesToSpawn = 10;
+
+    // NOVO: reset e inicialização do sistema de spawn
+    mElapsedSeconds = 0.0f;
+    mBoss5Spawned = mBoss10Spawned = false;
+    InitSpawnRules();
 }
 
 void Game::ResumeGame()
@@ -312,17 +315,17 @@ void Game::UpdateCamera(float deltaTime)
 {
     if (!mPlayer)
         return;
-    
+
     Vector2 playerPos = mPlayer->GetPosition();
-    
-    // Smoothly follow the player (center camera on player)
+
+    // follow
     Vector2 targetCameraPos = playerPos;
-    
+
     // Smooth camera movement
     Vector2 diff = targetCameraPos - mCameraPosition;
-    mCameraPosition += diff * (deltaTime * 5.0f); // 5.0f is camera follow speed
-    
-    // Apply screen shake
+    mCameraPosition += diff * (deltaTime * 5.0f); // 5.0f = follow speed
+
+    // Screen shake
     if (mScreenShakeDuration > 0.0f)
     {
         mScreenShakeDuration -= deltaTime;
@@ -331,8 +334,7 @@ void Game::UpdateCamera(float deltaTime)
             mScreenShakeAmount = 0.0f;
             mScreenShakeDuration = 0.0f;
         }
-        
-        // Add random shake offset
+
         float shakeX = Random::GetFloatRange(-mScreenShakeAmount, mScreenShakeAmount);
         float shakeY = Random::GetFloatRange(-mScreenShakeAmount, mScreenShakeAmount);
         mCameraPosition += Vector2(shakeX, shakeY);
@@ -347,33 +349,30 @@ void Game::AddScreenShake(float intensity, float duration)
 
 void Game::SpawnDeathParticles(const Vector2& position, const Vector3& color)
 {
-    CreateDeathParticles(position, color, 16); // More particles for cooler effect
+    CreateDeathParticles(position, color, 16);
 }
 
 void Game::CreateDeathParticles(const Vector2& position, const Vector3& color, int count)
 {
     // Create small particles for death effect
     std::vector<Vector2> particleVertices;
-    // Create a small square particle
     float size = Random::GetFloatRange(1.5f, 3.0f);
     particleVertices.emplace_back(Vector2(-size, -size));
     particleVertices.emplace_back(Vector2(size, -size));
     particleVertices.emplace_back(Vector2(size, size));
     particleVertices.emplace_back(Vector2(-size, size));
-    
+
     for (int i = 0; i < count; ++i)
     {
-        float angle = Random::GetFloatRange(0.0f, Math::TwoPi); // Random angle for more chaotic effect
+        float angle = Random::GetFloatRange(0.0f, Math::TwoPi);
         float speed = Random::GetFloatRange(80.0f, 250.0f);
         Vector2 dir(Math::Cos(angle), Math::Sin(angle));
         Vector2 particlePos = position + dir * Random::GetFloatRange(0.0f, 5.0f);
-        
-        // Create temporary particle actor
+
         Actor* particle = new Actor(this);
         particle->SetPosition(particlePos);
-        
+
         DrawComponent* drawComp = new DrawComponent(particle, particleVertices);
-        // Vary particle colors slightly for more visual interest
         Vector3 particleColor = color;
         particleColor.x = Math::Clamp(particleColor.x + Random::GetFloatRange(-0.2f, 0.2f), 0.0f, 1.0f);
         particleColor.y = Math::Clamp(particleColor.y + Random::GetFloatRange(-0.2f, 0.2f), 0.0f, 1.0f);
@@ -381,81 +380,176 @@ void Game::CreateDeathParticles(const Vector2& position, const Vector3& color, i
         drawComp->SetColor(particleColor);
         drawComp->SetFilled(true);
         drawComp->SetUseCamera(true);
-        
+
         RigidBodyComponent* rbComp = new RigidBodyComponent(particle, 0.1f);
         rbComp->SetVelocity(dir * speed);
-        
-        // Particles will be cleaned up naturally when they go out of bounds or after a delay
-        // We'll handle cleanup in UpdateActors - for now just mark as active
+
         particle->SetState(ActorState::Active);
     }
 }
 
+// =====================================================================================
+// NOVO SISTEMA DE SPAWN: regras por tempo/wave + hordas + ganchos de chefe
+// =====================================================================================
+
+void Game::InitSpawnRules()
+{
+    const float INF = std::numeric_limits<float>::infinity();
+
+    mSpawnRules.clear();
+    mRuleTimers.clear();
+    mTimedHordes.clear();
+
+    // Regras contínuas (por intervalo)
+    mSpawnRules.push_back({ EnemyKind::Comum,          1,   0.0f,  INF, 0.80f,  2 });
+    mSpawnRules.push_back({ EnemyKind::Corredor,       2,  30.0f,  INF, 1.30f,  2 });
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo, 3,  60.0f,  INF, 2.40f,  1 });
+    mSpawnRules.push_back({ EnemyKind::Atirador,       4,  90.0f,  INF, 4.50f,  1 });
+
+    mRuleTimers.resize(mSpawnRules.size(), 0.0f);
+
+    // Hordas pontuais (burst em tempos específicos)
+    mTimedHordes.push_back({  75.0f, EnemyKind::Comum,         25, 1, false });
+    mTimedHordes.push_back({ 135.0f, EnemyKind::Corredor,      18, 2, false });
+    mTimedHordes.push_back({ 180.0f, EnemyKind::GordoExplosivo, 8, 3, false });
+    mTimedHordes.push_back({ 240.0f, EnemyKind::Atirador,       6, 4, false });
+}
+
+void Game::SpawnEnemyOfKind(EnemyKind kind)
+{
+    if (!mPlayer) return;
+
+    // spawn em anel ao redor do player
+    Vector2 playerPos = mPlayer->GetPosition();
+    float spawnDistance = 350.0f + Random::GetFloatRange(-50.0f, 50.0f);
+    float angle = Random::GetFloatRange(0.0f, Math::TwoPi);
+
+    Vector2 spawnPos(
+        playerPos.x + Math::Cos(angle) * spawnDistance,
+        playerPos.y + Math::Sin(angle) * spawnDistance
+    );
+
+    // Clamp no mundo
+    const float radiusClamp = 25.0f;
+    spawnPos.x = Math::Clamp(spawnPos.x, radiusClamp, (float)WORLD_WIDTH  - radiusClamp);
+    spawnPos.y = Math::Clamp(spawnPos.y, radiusClamp, (float)WORLD_HEIGHT - radiusClamp);
+
+    // Escala por wave
+    const float w = (float)mCurrentWave;
+
+    float radius = 12.0f + (w * 0.4f);
+    float speed  = 70.0f  + (w * 2.0f);
+    float health = 25.0f  + (w * 6.0f);
+    Vector3 color(0.9f, 0.1f, 0.1f); // básico: vermelho
+
+    // flags de comportamento especiais
+    bool explodesOnDeath = false;
+    bool rangedShooter   = false;
+    float shootEvery     = 0.0f; // 0 = não atira
+
+    switch (kind)
+    {
+        case EnemyKind::Comum:
+            // base
+            break;
+        case EnemyKind::Corredor:
+            speed  *= 1.8f;
+            radius *= 0.9f;
+            health *= 0.8f;
+            color = Vector3(1.0f, 0.6f, 0.2f); // laranja
+            break;
+        case EnemyKind::GordoExplosivo:
+            speed  *= 0.6f;
+            radius *= 1.4f;
+            health *= 3.0f;
+            color = Vector3(0.3f, 0.9f, 0.3f); // verde
+            explodesOnDeath = true;
+            break;
+        case EnemyKind::Atirador:
+            speed  *= 0.9f;
+            radius *= 1.05f;
+            health *= 1.6f;
+            color = Vector3(0.6f, 0.4f, 1.0f); // roxo
+            rangedShooter = true;
+            shootEvery = 2.6f;
+            break;
+    }
+
+    auto* enemy = new Enemy(this, radius, speed, health);
+    enemy->SetPosition(spawnPos);
+    enemy->SetColor(color);
+
+    // Requer setters adicionados em Enemy.h/Enemy.cpp
+    enemy->SetExplodesOnDeath(explodesOnDeath);
+    enemy->SetRangedShooter(rangedShooter, shootEvery);
+}
+
+void Game::SpawnHorde(EnemyKind kind, int count)
+{
+    for (int i = 0; i < count; ++i)
+        SpawnEnemyOfKind(kind);
+}
+
 void Game::UpdateWaveSystem(float deltaTime)
 {
-    mWaveTimer += deltaTime;
-    
-    // Vampire Survivors-style: continuous spawning based on time
-    // Spawn rate increases over time - much faster now!
-    float spawnRate = 0.3f - (mWaveTimer * 0.0005f); // Gets faster over time
-    if (spawnRate < 0.05f) spawnRate = 0.05f; // Minimum spawn rate
-    
-    static float spawnTimer = 0.0f;
-    spawnTimer += deltaTime;
-    
-    // Spawn enemies continuously - WAY MORE enemies!
-    int maxEnemies = 300 + (mCurrentWave * 20); // Much higher limit
-    if (spawnTimer >= spawnRate && mEnemies.size() < maxEnemies)
-    {
-        // Spawn way more enemies per wave
-        int spawnCount = 3 + (mCurrentWave * 2); // Many more enemies per spawn
-        if (spawnCount > 50) spawnCount = 50; // Cap at 50 per spawn
-        SpawnEnemies(spawnCount);
-        spawnTimer = 0.0f;
-    }
-    
-    // Update wave number based on time (every 30 seconds)
+    mElapsedSeconds += deltaTime;
+    mWaveTimer      += deltaTime;
+
+    // Wave avança a cada 30s (mantendo sua lógica original)
     int newWave = 1 + static_cast<int>(mWaveTimer / 30.0f);
     if (newWave > mCurrentWave)
     {
         mCurrentWave = newWave;
     }
-}
 
-void Game::SpawnEnemies(int count)
-{
-    if (!mPlayer)
-        return;
+    // Limite global de população para não saturar
+    const int maxEnemies = 400 + (mCurrentWave * 30);
+    if ((int)mEnemies.size() >= maxEnemies) return;
 
-    Vector2 playerPos = mPlayer->GetPosition();
-    
-    for (int i = 0; i < count; ++i)
+    // 1) Regras contínuas (intervalos por tipo)
+    for (size_t i = 0; i < mSpawnRules.size(); ++i)
     {
-        Vector2 spawnPos;
-        
-        // Spawn enemies around player at a distance (world coordinates)
-        float spawnDistance = 350.0f + Random::GetFloatRange(-50.0f, 50.0f); // Variable distance
-        float angle = Random::GetFloatRange(0.0f, Math::TwoPi);
-        
-        spawnPos.x = playerPos.x + Math::Cos(angle) * spawnDistance;
-        spawnPos.y = playerPos.y + Math::Sin(angle) * spawnDistance;
-        
-        // Clamp to world bounds
-        float radius = 20.0f;
-        if (spawnPos.x < radius) spawnPos.x = radius;
-        if (spawnPos.x > WORLD_WIDTH - radius) spawnPos.x = WORLD_WIDTH - radius;
-        if (spawnPos.y < radius) spawnPos.y = radius;
-        if (spawnPos.y > WORLD_HEIGHT - radius) spawnPos.y = WORLD_HEIGHT - radius;
-        
-        // Enemies get stronger over time
-        float enemyRadius = 12.0f + (mCurrentWave * 0.5f);
-        float speed = 70.0f + (mCurrentWave * 3.0f);
-        float health = 25.0f + (mCurrentWave * 8.0f);
-        
-        Enemy* enemy = new Enemy(this, enemyRadius, speed, health);
-        enemy->SetPosition(spawnPos);
+        auto& r = mSpawnRules[i];
+        if (mCurrentWave >= r.minWave &&
+            mElapsedSeconds >= r.start &&
+            mElapsedSeconds <= r.end)
+        {
+            mRuleTimers[i] += deltaTime;
+            while (mRuleTimers[i] >= r.every && (int)mEnemies.size() < maxEnemies)
+            {
+                for (int c = 0; c < r.count && (int)mEnemies.size() < maxEnemies; ++c)
+                    SpawnEnemyOfKind(r.kind);
+
+                mRuleTimers[i] -= r.every;
+            }
+        }
+    }
+
+    // 2) Hordas pontuais (um disparo)
+    for (auto& h : mTimedHordes)
+    {
+        if (!h.fired &&
+            mElapsedSeconds >= h.atTime &&
+            mCurrentWave >= h.minWave)
+        {
+            SpawnHorde(h.kind, h.count);
+            h.fired = true;
+        }
+    }
+
+    // 3) Ganchos de chefes (ex.: wave 5 e 10)
+    if (mCurrentWave >= 5 && !mBoss5Spawned)
+    {
+        // TODO: instanciar boss da wave 5
+        mBoss5Spawned = true;
+    }
+    if (mCurrentWave >= 10 && !mBoss10Spawned)
+    {
+        // TODO: instanciar boss da wave 10
+        mBoss10Spawned = true;
     }
 }
+// =====================================================================================
 
 void Game::DrawUI()
 {
@@ -464,7 +558,7 @@ void Game::DrawUI()
 
     // Draw health bar
     float healthPercent = mPlayer->GetHealth() / mPlayer->GetMaxHealth();
-    // Helper lambda to create VertexArray from Vector2 vertices
+
     auto createVA = [](const std::vector<Vector2>& vertices) -> VertexArray* {
         std::vector<float> floatArray;
         std::vector<unsigned int> indices;
@@ -477,31 +571,31 @@ void Game::DrawUI()
         }
         return new VertexArray(floatArray.data(), static_cast<unsigned int>(vertices.size()), indices.data(), static_cast<unsigned int>(indices.size()));
     };
-    
+
     std::vector<Vector2> healthBg;
     healthBg.emplace_back(Vector2(20.0f, 20.0f));
     healthBg.emplace_back(Vector2(220.0f, 20.0f));
     healthBg.emplace_back(Vector2(220.0f, 40.0f));
     healthBg.emplace_back(Vector2(20.0f, 40.0f));
-    
+
     Matrix4 healthBgMatrix = Matrix4::Identity;
     VertexArray* healthBgVA = createVA(healthBg);
     Vector3 healthBgColor(0.2f, 0.2f, 0.2f);
     mRenderer->Draw(healthBgMatrix, healthBgVA, healthBgColor);
     delete healthBgVA;
-    
+
     std::vector<Vector2> healthBar;
     healthBar.emplace_back(Vector2(20.0f, 20.0f));
     healthBar.emplace_back(Vector2(20.0f + 200.0f * healthPercent, 20.0f));
     healthBar.emplace_back(Vector2(20.0f + 200.0f * healthPercent, 40.0f));
     healthBar.emplace_back(Vector2(20.0f, 40.0f));
-    
+
     Matrix4 healthMatrix = Matrix4::Identity;
     VertexArray* healthVA = createVA(healthBar);
     Vector3 healthColor(1.0f - healthPercent, healthPercent, 0.0f);
     mRenderer->Draw(healthMatrix, healthVA, healthColor);
     delete healthVA;
-    
+
     // Draw experience bar
     float expPercent = mPlayer->GetExperience() / mPlayer->GetExperienceToNextLevel();
     std::vector<Vector2> expBg;
@@ -509,47 +603,47 @@ void Game::DrawUI()
     expBg.emplace_back(Vector2(220.0f, 50.0f));
     expBg.emplace_back(Vector2(220.0f, 60.0f));
     expBg.emplace_back(Vector2(20.0f, 60.0f));
-    
+
     Matrix4 expBgMatrix = Matrix4::Identity;
     VertexArray* expBgVA = createVA(expBg);
     Vector3 expBgColor(0.2f, 0.2f, 0.2f);
     mRenderer->Draw(expBgMatrix, expBgVA, expBgColor);
     delete expBgVA;
-    
+
     std::vector<Vector2> expBar;
     expBar.emplace_back(Vector2(20.0f, 50.0f));
     expBar.emplace_back(Vector2(20.0f + 200.0f * expPercent, 50.0f));
     expBar.emplace_back(Vector2(20.0f + 200.0f * expPercent, 60.0f));
     expBar.emplace_back(Vector2(20.0f, 60.0f));
-    
+
     Matrix4 expMatrix = Matrix4::Identity;
     VertexArray* expVA = createVA(expBar);
     Vector3 expColor(0.2f, 0.8f, 1.0f);
     mRenderer->Draw(expMatrix, expVA, expColor);
     delete expVA;
-    
-    // Draw wave counter
+
+    // Wave panel
     std::vector<Vector2> waveBg;
     waveBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) - 150.0f, 20.0f));
     waveBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) - 20.0f, 20.0f));
     waveBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) - 20.0f, 60.0f));
     waveBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) - 150.0f, 60.0f));
-    
+
     Matrix4 waveMatrix = Matrix4::Identity;
     VertexArray* waveVA = createVA(waveBg);
     Vector3 waveColor(0.3f, 0.3f, 0.4f);
     mRenderer->Draw(waveMatrix, waveVA, waveColor);
     delete waveVA;
-    
-    // Draw text labels
-    TextRenderer::DrawText(mRenderer, "HP", Vector2(25.0f, 5.0f), 0.7f, Vector3(1.0f, 0.5f, 0.5f));
+
+    // Labels
+    TextRenderer::DrawText(mRenderer, "HP",  Vector2(25.0f,  5.0f), 0.7f, Vector3(1.0f, 0.5f, 0.5f));
     TextRenderer::DrawText(mRenderer, "EXP", Vector2(25.0f, 45.0f), 0.7f, Vector3(0.5f, 0.8f, 1.0f));
-    
-    // Draw wave text
+
+    // Wave text
     std::string waveText = "WAVE " + std::to_string(mCurrentWave);
     TextRenderer::DrawText(mRenderer, waveText, Vector2(static_cast<float>(WINDOW_WIDTH) - 140.0f, 35.0f), 0.8f, Vector3(1.0f, 1.0f, 1.0f));
-    
-    // Draw level text
+
+    // Level text
     std::string levelText = "LVL " + std::to_string(mPlayer->GetLevel());
     TextRenderer::DrawText(mRenderer, levelText, Vector2(250.0f, 25.0f), 0.8f, Vector3(1.0f, 1.0f, 0.0f));
 }
@@ -561,7 +655,7 @@ void Game::CleanupGame()
     {
         delete mActors.back();
     }
-    
+
     mEnemies.clear();
     mProjectiles.clear();
     mPlayer = nullptr;
@@ -569,34 +663,28 @@ void Game::CleanupGame()
 
 void Game::AddActor(Actor* actor)
 {
-
     if (mUpdatingActors)
     {
         mPendingActors.emplace_back(actor);
     }
     else
     {
-
         mActors.emplace_back(actor);
     }
 }
 
 void Game::RemoveActor(Actor* actor)
 {
-
     auto iter = std::find(mPendingActors.begin(), mPendingActors.end(), actor);
     if (iter != mPendingActors.end())
     {
-
         std::iter_swap(iter, mPendingActors.end() - 1);
         mPendingActors.pop_back();
     }
 
-
     iter = std::find(mActors.begin(), mActors.end(), actor);
     if (iter != mActors.end())
     {
-
         std::iter_swap(iter, mActors.end() - 1);
         mActors.pop_back();
     }
@@ -630,7 +718,6 @@ void Game::GenerateOutput()
     }
     else if (mGameState == MenuState::Paused)
     {
-        // Draw game in background
         for (auto drawable : mDrawables)
         {
             drawable->Draw(mRenderer);
@@ -640,7 +727,6 @@ void Game::GenerateOutput()
     }
     else if (mGameState == MenuState::UpgradeMenu)
     {
-        // Draw game in background
         for (auto drawable : mDrawables)
         {
             drawable->Draw(mRenderer);
@@ -650,41 +736,38 @@ void Game::GenerateOutput()
     }
     else if (mGameState == MenuState::Playing)
     {
-        // Draw all game objects
-    for (auto drawable : mDrawables)
-    {
-        drawable->Draw(mRenderer);
-    }
-    
+        for (auto drawable : mDrawables)
+        {
+            drawable->Draw(mRenderer);
+        }
+
         DrawUI();
 
-    if (mIsDebugging)
-    {
-        for (auto actor : mActors)
+        if (mIsDebugging)
         {
-            for (auto component : actor->GetComponents())
+            for (auto actor : mActors)
             {
-                component->DebugDraw(mRenderer);
+                for (auto component : actor->GetComponents())
+                {
+                    component->DebugDraw(mRenderer);
+                }
             }
         }
     }
-    }
     else if (mGameState == MenuState::GameOver)
     {
-        // Draw game in background
         for (auto drawable : mDrawables)
         {
             drawable->Draw(mRenderer);
         }
         DrawUI();
-        
-        // Draw game over screen
+
         std::vector<Vector2> gameOverBg;
         gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f - 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f - 100.0f));
         gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f + 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f - 100.0f));
         gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f + 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f + 100.0f));
         gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f - 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f + 100.0f));
-        
+
         std::vector<float> goFloatArray;
         std::vector<unsigned int> goIndices;
         for (size_t i = 0; i < gameOverBg.size(); ++i)
@@ -694,7 +777,7 @@ void Game::GenerateOutput()
             goFloatArray.push_back(0.0f);
             goIndices.push_back(static_cast<unsigned int>(i));
         }
-        
+
         Matrix4 gameOverMatrix = Matrix4::Identity;
         VertexArray gameOverVA(goFloatArray.data(), static_cast<unsigned int>(gameOverBg.size()), goIndices.data(), static_cast<unsigned int>(goIndices.size()));
         Vector3 gameOverColor(0.8f, 0.2f, 0.2f);
@@ -707,7 +790,7 @@ void Game::GenerateOutput()
 void Game::Shutdown()
 {
     CleanupGame();
-    
+
     delete mMainMenu;
     delete mPauseMenu;
     delete mUpgradeMenu;
