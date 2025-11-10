@@ -78,7 +78,7 @@ public:
     Vector2 GetCameraPosition() const { return mCameraPosition; }
     void UpdateCamera(float deltaTime);
     void AddScreenShake(float intensity, float duration = 0.2f);
-    void SpawnDeathParticles(const Vector2& position, const Vector3& color);
+    void SpawnExplosionParticles(const Vector2& position, const Vector3& color);
 
     void AddEnemy(class Enemy* enemy);
     void RemoveEnemy(class Enemy* enemy);
@@ -108,6 +108,8 @@ public:
                          bool fromPlayer = true,
                          float damage = 10.0f);
 
+    void SpawnFallingParticles(const Vector2& position, const Vector3& color);
+    void SpawnExplosionRing(const Vector2& position, float radius);
 private:
     void ProcessInput();
     void UpdateGame();
@@ -160,6 +162,5 @@ private:
     Vector2 mCameraPosition;
     float mScreenShakeAmount;
     float mScreenShakeDuration;
-
     void CreateDeathParticles(const Vector2& position, const Vector3& color, int count = 8);
 };

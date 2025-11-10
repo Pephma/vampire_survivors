@@ -352,7 +352,8 @@ void Game::AddScreenShake(float intensity, float duration)
     mScreenShakeDuration = duration;
 }
 
-void Game::SpawnDeathParticles(const Vector2& position, const Vector3& color)
+// RENOMEADO: Esta função agora é específica para a explosão
+void Game::SpawnExplosionParticles(const Vector2& position, const Vector3& color)
 {
     CreateDeathParticles(position, color, 16);
 }
@@ -390,8 +391,89 @@ void Game::CreateDeathParticles(const Vector2& position, const Vector3& color, i
         rbComp->SetVelocity(dir * speed);
 
         particle->SetState(ActorState::Active);
+        particle->SetLifetime(0.5f);
     }
 }
+
+
+// NOVO: Efeito de partículas "caindo" para inimigos comuns
+void Game::SpawnFallingParticles(const Vector2& position, const Vector3& color)
+{
+    // Cria partículas pequenas (quadrados)
+    std::vector<Vector2> particleVertices;
+    float size = Random::GetFloatRange(1.5f, 3.0f);
+    particleVertices.emplace_back(Vector2(-size, -size));
+    particleVertices.emplace_back(Vector2(size, -size));
+    particleVertices.emplace_back(Vector2(size, size));
+    particleVertices.emplace_back(Vector2(-size, size));
+
+    int count = 12; // Menos partículas que a explosão
+
+    for (int i = 0; i < count; ++i)
+    {
+        // Direção: X aleatório, Y predominantemente para baixo (simulando "cair")
+        float dirX = Random::GetFloatRange(-0.6f, 0.6f);
+        float dirY = Random::GetFloatRange(0.4f, 1.0f); // Positivo = para baixo
+        float speed = Random::GetFloatRange(40.0f, 120.0f); // Mais lento que a explosão
+        Vector2 dir(dirX, dirY);
+        dir.Normalize(); // Garante consistência na velocidade
+
+        Vector2 particlePos = position + dir * Random::GetFloatRange(0.0f, 5.0f);
+
+        Actor* particle = new Actor(this);
+        particle->SetPosition(particlePos);
+
+        DrawComponent* drawComp = new DrawComponent(particle, particleVertices);
+        // Variação de cor (tom de poeira/cinza)
+        Vector3 particleColor = color;
+        particleColor.x = Math::Clamp(particleColor.x + Random::GetFloatRange(-0.1f, 0.1f), 0.0f, 1.0f);
+        particleColor.y = Math::Clamp(particleColor.y + Random::GetFloatRange(-0.1f, 0.1f), 0.0f, 1.0f);
+        particleColor.z = Math::Clamp(particleColor.z + Random::GetFloatRange(-0.1f, 0.1f), 0.0f, 1.0f);
+        drawComp->SetColor(particleColor);
+        drawComp->SetFilled(true);
+        drawComp->SetUseCamera(true);
+
+        RigidBodyComponent* rbComp = new RigidBodyComponent(particle, 0.1f);
+        rbComp->SetVelocity(dir * speed);
+
+        // NOTA: Assim como as partículas de 'CreateDeathParticles', este ator
+        // não tem um tempo de vida (lifetime) e só será limpo pela
+        // verificação de distância da câmera (Game.cpp linha 250).
+        particle->SetLifetime(0.2f);
+    }
+}
+
+// NOVO: Círculo de demarcação da explosão
+void Game::SpawnExplosionRing(const Vector2& position, float radius)
+{
+    Actor* ring = new Actor(this);
+    ring->SetPosition(position);
+
+    // Vértices do círculo (baseado no Enemy.cpp)
+    std::vector<Vector2> vertices;
+    const int numVertices = 32; // Mais vértices para um círculo suave
+    for (int i = 0; i < numVertices; ++i)
+    {
+        float angle = (Math::TwoPi / numVertices) * i;
+        vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
+    }
+    // Adiciona o primeiro vértice no final para fechar o loop
+    vertices.emplace_back(vertices[0]);
+
+
+    DrawComponent* drawComp = new DrawComponent(ring, vertices);
+    drawComp->SetColor(Vector3(1.0f, 0.5f, 0.2f)); // Laranja da explosão
+    drawComp->SetFilled(false); // Importante: desenha só a linha (o anel)
+    drawComp->SetUseCamera(true);
+
+    // NOTA: Este ator também não tem tempo de vida (Lifetime),
+    // seguindo o padrão das partículas de morte existentes.
+    // O ideal seria adicionar um componente ou lógica de autodestruição
+    // (ex: desaparecer após 0.5 segundos).
+    ring->SetLifetime(0.3f);
+}
+
+
 
 // =====================================================================================
 // NOVO SISTEMA DE SPAWN: regras por tempo/wave + hordas + ganchos de chefe
@@ -410,7 +492,7 @@ void Game::InitSpawnRules()
     // Fast entram a partir da wave 3
     mSpawnRules.push_back({ EnemyKind::Corredor,  3,   20.0f,  INFINITY, 1.20f,  3 });
     // Tanks a partir da wave 5
-    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  5,   60.0f,  INFINITY, 2.50f,  1 });
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  1,   0.0f,  INFINITY, 2.50f,  10 });
     // Elites espaçados a partir da wave 7
     mSpawnRules.push_back({ EnemyKind::Atirador, 7,  120.0f,  INFINITY, 8.00f,  1 });
     mRuleTimers.resize(mSpawnRules.size(), 0.0f);

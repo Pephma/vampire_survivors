@@ -40,6 +40,10 @@ public:
     ActorState GetState() const { return mState; }
     void SetState(ActorState state) { mState = state; }
 
+    // --- ADIÇÃO: Função para definir o tempo de vida ---
+    void SetLifetime(float lifetime) { mLifetime = lifetime; }
+    // --------------------------------------------------
+
     Vector2 GetForward() const { return Vector2(Math::Cos(mRotation), Math::Sin(mRotation)); }
 
     Matrix4 GetModelMatrix() const;
@@ -74,6 +78,10 @@ protected:
     Vector2 mPosition;
     Vector2 mScale;
     float mRotation;
+
+    // --- ADIÇÃO: Variável para armazenar o tempo de vida ---
+    float mLifetime; // Em segundos. -1.0f significa vida infinita.
+    // -----------------------------------------------------
 
     std::vector<class Component*> mComponents;
 

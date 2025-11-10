@@ -79,13 +79,20 @@ void Enemy::OnUpdate(float deltaTime)
     // morte
     if (mHealth <= 0.0f)
     {
-        // explosão do Gordo Explosivo
+        // Efeitos de morte
         if (mExplodesOnDeath)
         {
+            // Gordo Explosivo: Lógica de explosão e círculo
             DoDeathExplosion();
         }
+        else
+        {
+            // Outros inimigos: Partículas caindo
+            // (Usando uma cor cinza/branca padrão para poeira)
+            GetGame()->SpawnFallingParticles(GetPosition(), Vector3(0.8f, 0.8f, 0.8f));
+        }
 
-        // XP
+        // XP (acontece para todos)
         if (player)
         {
             player->AddExperience(mExperienceValue);
@@ -164,22 +171,31 @@ float Enemy::TakeDamage(float damage)
 
 void Enemy::DoDeathExplosion()
 {
-    // dano em área no jogador (único alvo hoje)
     auto* player = GetGame()->GetPlayer();
-    if (!player) return;
+    Vector2 e = GetPosition(); // Posição do inimigo
 
-    Vector2 p = player->GetPosition();
-    Vector2 e = GetPosition();
-    float dist = (p - e).Length();
-
-    if (dist <= mExplosionRadius)
+    // Dano em área no jogador
+    if (player)
     {
-        // escala leve com a distância (opcional)
-        float falloff = 1.0f - Math::Clamp(dist / mExplosionRadius, 0.0f, 1.0f);
-        player->TakeDamage(mExplosionDamage * (0.6f + 0.4f * falloff));
-        GetGame()->AddScreenShake(6.0f, 0.2f);
+        Vector2 p = player->GetPosition();
+        float dist = (p - e).Length();
+
+        // Se o jogador estiver dentro do raio da explosão
+        if (dist <= mExplosionRadius)
+        {
+            // Escala o dano com a distância (opcional)
+            float falloff = 1.0f - Math::Clamp(dist / mExplosionRadius, 0.0f, 1.0f);
+            player->TakeDamage(mExplosionDamage * (0.6f + 0.4f * falloff)); // Aplica dano no jogador
+            GetGame()->AddScreenShake(6.0f, 0.2f); // Efeito de tremor de tela
+        }
     }
 
-    // efeito visual
-    GetGame()->SpawnDeathParticles(e, Vector3(1.0f, 0.5f, 0.2f));
+    // --- Efeitos Visuais da Explosão ---
+
+    // 1. Partículas da explosão (antiga SpawnDeathParticles, agora renomeada)
+    GetGame()->SpawnExplosionParticles(e, Vector3(1.0f, 0.5f, 0.2f));
+
+    // 2. NOVO: Anel de demarcação do raio
+    GetGame()->SpawnExplosionRing(e, mExplosionRadius);
 }
+
