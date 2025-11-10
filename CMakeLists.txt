@@ -81,6 +81,8 @@ add_executable(${PROJECT_NAME}
         Source/Menus/UpgradeMenu.h
         Source/Audio/AudioSystem.cpp
         Source/Audio/AudioSystem.h
+        Source/Actors/Boss.cpp
+        Source/Actors/Boss.h
 )
 
 # Link libraries

@@ -9,6 +9,13 @@
 // ============================================
 enum class EnemyKind { Comum, Corredor, GordoExplosivo, Atirador };
 
+
+enum class BossKind
+{
+    Tank,       // O chefe (Lento, vida alta, ataque Burst)
+    Sprayer     // Novo chefe (Rápido, vida média, ataque Espiral)
+};
+
 struct SpawnRule {
     EnemyKind kind;
     int       minWave;
@@ -110,6 +117,10 @@ public:
 
     void SpawnFallingParticles(const Vector2& position, const Vector3& color);
     void SpawnExplosionRing(const Vector2& position, float radius);
+
+    void AddBoss(class Boss* boss);
+    void RemoveBoss(class Boss* boss);
+    void SpawnBoss(int waveNumber);
 private:
     void ProcessInput();
     void UpdateGame();
@@ -163,4 +174,7 @@ private:
     float mScreenShakeAmount;
     float mScreenShakeDuration;
     void CreateDeathParticles(const Vector2& position, const Vector3& color, int count = 8);
+
+    std::vector<class Boss*> mBosses;
+    int mLastBossWaveSpawned;
 };

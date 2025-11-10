@@ -11,6 +11,7 @@
 #include "Actors/Player.h"
 #include "Actors/Enemy.h"
 #include "Actors/Projectile.h"
+#include "Actors/Boss.h" // <-- INCLUÍDO O CHEFE
 #include "Menus/MainMenu.h"
 #include "Menus/PauseMenu.h"
 #include "Menus/UpgradeMenu.h"
@@ -40,11 +41,12 @@ Game::Game()
         , mEnemiesSpawned(0)
         , mEnemiesToSpawn(10)
         , mElapsedSeconds(0.0f)
-        , mBoss5Spawned(false)
-        , mBoss10Spawned(false)
+        , mBoss5Spawned(false) // (Não mais usado pela nova lógica)
+        , mBoss10Spawned(false) // (Não mais usado pela nova lógica)
         , mCameraPosition(Vector2::Zero)
         , mScreenShakeAmount(0.0f)
         , mScreenShakeDuration(0.0f)
+        , mLastBossWaveSpawned(0) // <-- ADICIONADO PARA O CHEFE
 {
 }
 
@@ -224,6 +226,54 @@ void Game::RemoveEnemy(Enemy* enemy)
     }
 }
 
+// --- FUNÇÕES DO CHEFE ADICIONADAS ---
+void Game::AddBoss(Boss* boss)
+{
+    mBosses.emplace_back(boss);
+}
+
+void Game::RemoveBoss(Boss* boss)
+{
+    auto it = std::find(mBosses.begin(), mBosses.end(), boss);
+    if (it != mBosses.end())
+    {
+        mBosses.erase(it);
+    }
+}
+
+void Game::SpawnBoss(int waveNumber)
+{
+    // --- LÓGICA DE ESCOLHA DO CHEFE ---
+    BossKind kind;
+
+    if (waveNumber == 5)
+    {
+        kind = BossKind::Tank;
+    }
+    else if (waveNumber == 10)
+    {
+        kind = BossKind::Sprayer;
+    }
+    else
+    {
+        // Padrão para waves 15, 20, 25... (repete o Tank, mas mais forte)
+        kind = BossKind::Tank;
+    }
+    // ---------------------------------
+
+    // Spawna o chefe (ex: no meio superior da tela)
+    Vector2 playerPos = mPlayer ? mPlayer->GetPosition() : Vector2(WORLD_WIDTH / 2.0f, WORLD_HEIGHT / 2.0f);
+    Vector2 spawnPos(playerPos.x, playerPos.y - 400.0f); // Spawna acima do jogador
+
+    // --- MODIFICADO ---
+    // Passa o 'kind' e 'waveNumber' para o construtor
+    Boss* boss = new Boss(this, kind, waveNumber);
+    // ------------------
+
+    boss->SetPosition(spawnPos);
+}
+// ------------------------------------
+
 void Game::AddProjectile(Projectile* projectile)
 {
     mProjectiles.emplace_back(projectile);
@@ -238,7 +288,6 @@ void Game::RemoveProjectile(Projectile* projectile)
     }
 }
 
-// AJUSTADO: repassa fromPlayer e damage ao construtor de Projectile
 void Game::SpawnProjectile(const Vector2& position,
                            const Vector2& direction,
                            float speed,
@@ -266,8 +315,12 @@ void Game::StartNewGame()
 
     // NOVO: reset e inicialização do sistema de spawn
     mElapsedSeconds = 0.0f;
-    mBoss5Spawned = mBoss10Spawned = false;
     InitSpawnRules();
+
+    // Reseta a lógica do chefe
+    mBosses.clear();
+    mLastBossWaveSpawned = 0;
+    // ----------------------------------------
 }
 
 void Game::ResumeGame()
@@ -391,7 +444,7 @@ void Game::CreateDeathParticles(const Vector2& position, const Vector3& color, i
         rbComp->SetVelocity(dir * speed);
 
         particle->SetState(ActorState::Active);
-        particle->SetLifetime(0.5f);
+        particle->SetLifetime(0.5f); // <-- Tempo de vida adicionado
     }
 }
 
@@ -436,10 +489,7 @@ void Game::SpawnFallingParticles(const Vector2& position, const Vector3& color)
         RigidBodyComponent* rbComp = new RigidBodyComponent(particle, 0.1f);
         rbComp->SetVelocity(dir * speed);
 
-        // NOTA: Assim como as partículas de 'CreateDeathParticles', este ator
-        // não tem um tempo de vida (lifetime) e só será limpo pela
-        // verificação de distância da câmera (Game.cpp linha 250).
-        particle->SetLifetime(0.2f);
+        particle->SetLifetime(0.2f); // <-- Tempo de vida adicionado
     }
 }
 
@@ -466,11 +516,7 @@ void Game::SpawnExplosionRing(const Vector2& position, float radius)
     drawComp->SetFilled(false); // Importante: desenha só a linha (o anel)
     drawComp->SetUseCamera(true);
 
-    // NOTA: Este ator também não tem tempo de vida (Lifetime),
-    // seguindo o padrão das partículas de morte existentes.
-    // O ideal seria adicionar um componente ou lógica de autodestruição
-    // (ex: desaparecer após 0.5 segundos).
-    ring->SetLifetime(0.3f);
+    ring->SetLifetime(0.3f); // <-- Tempo de vida adicionado
 }
 
 
@@ -492,7 +538,7 @@ void Game::InitSpawnRules()
     // Fast entram a partir da wave 3
     mSpawnRules.push_back({ EnemyKind::Corredor,  3,   20.0f,  INFINITY, 1.20f,  3 });
     // Tanks a partir da wave 5
-    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  1,   0.0f,  INFINITY, 2.50f,  10 });
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  5,   0.0f,  INFINITY, 2.50f,  2 });
     // Elites espaçados a partir da wave 7
     mSpawnRules.push_back({ EnemyKind::Atirador, 7,  120.0f,  INFINITY, 8.00f,  1 });
     mRuleTimers.resize(mSpawnRules.size(), 0.0f);
@@ -585,11 +631,27 @@ void Game::UpdateWaveSystem(float deltaTime)
     if (newWave > mCurrentWave)
     {
         mCurrentWave = newWave;
+
+        // --- LÓGICA DE SPAWN DO CHEFE (MODIFICADO) ---
+        // É uma onda de chefe (múltipla de 5) E ainda não spawnamos nesta wave?
+        if (mCurrentWave % 5 == 0 && mCurrentWave > mLastBossWaveSpawned)
+        {
+            SpawnBoss(mCurrentWave);
+            mLastBossWaveSpawned = mCurrentWave;
+        }
+        // --- FIM DA LÓGICA DO CHEFE ---
     }
 
     // Limite global de população para não saturar
     const int maxEnemies = 400 + (mCurrentWave * 30);
     if ((int)mEnemies.size() >= maxEnemies) return;
+
+    // --- PAUSA O SPAWN NORMAL SE UM CHEFE ESTIVER ATIVO (MODIFICADO) ---
+    if (!mBosses.empty())
+    {
+        return; // Não spawna inimigos normais durante a luta do chefe
+    }
+    // -----------------------------------------------------------
 
     // 1) Regras contínuas (intervalos por tipo)
     for (size_t i = 0; i < mSpawnRules.size(); ++i)
@@ -623,19 +685,11 @@ void Game::UpdateWaveSystem(float deltaTime)
         }
     }
 
-    // 3) Ganchos de chefes (ex.: wave 5 e 10)
-    if (mCurrentWave >= 5 && !mBoss5Spawned)
-    {
-        // TODO: instanciar boss da wave 5
-        mBoss5Spawned = true;
-    }
-    if (mCurrentWave >= 10 && !mBoss10Spawned)
-    {
-        // TODO: instanciar boss da wave 10
-        mBoss10Spawned = true;
-    }
+    // 3) Ganchos de chefes (Lógica antiga removida, substituída pela nova acima)
 }
 // =====================================================================================
+
+// Em Game.cpp
 
 void Game::DrawUI()
 {
@@ -732,6 +786,62 @@ void Game::DrawUI()
     // Level text
     std::string levelText = "LVL " + std::to_string(mPlayer->GetLevel());
     TextRenderer::DrawText(mRenderer, levelText, Vector2(250.0f, 25.0f), 0.8f, Vector3(1.0f, 1.0f, 0.0f));
+
+    // --- ⬇️ BLOCO ADICIONADO PARA A BARRA DE VIDA DO CHEFE ⬇️ ---
+
+    // ---------------------------------
+    //  BARRA DE VIDA DO CHEFE (BOSS)
+    // ---------------------------------
+    if (!mBosses.empty()) // Só desenha se houver um chefe na lista
+    {
+        // Pega o primeiro chefe da lista (normalmente só haverá um)
+        Boss* boss = mBosses[0];
+        if (boss)
+        {
+            float healthPercent = boss->GetHealth() / boss->GetMaxHealth();
+            if (healthPercent < 0.0f) healthPercent = 0.0f;
+
+            // Posição e tamanho da barra (centralizada no topo)
+            const float barWidth = 600.0f; // Barra larga
+            const float barHeight = 20.0f;
+            // Centraliza horizontalmente
+            const float barX = (static_cast<float>(WINDOW_WIDTH) / 2.0f) - (barWidth / 2.0f);
+            const float barY = 40.0f; // Posição Y (perto do topo)
+
+            // 1. Desenha o fundo da barra (cinza escuro)
+            std::vector<Vector2> bossBg;
+            bossBg.emplace_back(Vector2(barX, barY));
+            bossBg.emplace_back(Vector2(barX + barWidth, barY));
+            bossBg.emplace_back(Vector2(barX + barWidth, barY + barHeight));
+            bossBg.emplace_back(Vector2(barX, barY + barHeight));
+
+            Matrix4 bossBgMatrix = Matrix4::Identity;
+            VertexArray* bossBgVA = createVA(bossBg);
+            Vector3 bossBgColor(0.2f, 0.2f, 0.2f); // Cinza escuro
+            mRenderer->Draw(bossBgMatrix, bossBgVA, bossBgColor);
+            delete bossBgVA;
+
+            // 2. Desenha a barra de vida (vermelha)
+            std::vector<Vector2> bossHealth;
+            bossHealth.emplace_back(Vector2(barX, barY));
+            bossHealth.emplace_back(Vector2(barX + barWidth * healthPercent, barY));
+            bossHealth.emplace_back(Vector2(barX + barWidth * healthPercent, barY + barHeight));
+            bossHealth.emplace_back(Vector2(barX, barY + barHeight));
+
+            Matrix4 bossHealthMatrix = Matrix4::Identity;
+            VertexArray* bossHealthVA = createVA(bossHealth);
+            // Cor (vermelho-roxo, para combinar com o chefe)
+            Vector3 bossHealthColor(0.9f, 0.1f, 0.5f);
+            mRenderer->Draw(bossHealthMatrix, bossHealthVA, bossHealthColor);
+            delete bossHealthVA;
+
+            // 3. Desenha o rótulo "BOSS"
+            // Centraliza o texto acima da barra
+            float labelX = (static_cast<float>(WINDOW_WIDTH) / 2.0f) - 30.0f; // Ajuste baseado na sua fonte
+            TextRenderer::DrawText(mRenderer, "BOSS", Vector2(labelX, 15.0f), 1.0f, Vector3(1.0f, 0.2f, 0.2f));
+        }
+    }
+    // --- ⬆️ FIM DO BLOCO ADICIONADO ⬆️ ---
 }
 
 void Game::CleanupGame()
@@ -745,6 +855,10 @@ void Game::CleanupGame()
     mEnemies.clear();
     mProjectiles.clear();
     mPlayer = nullptr;
+
+    // --- ADICIONADO PARA O CHEFE ---
+    mBosses.clear();
+    // -----------------------------
 }
 
 void Game::AddActor(Actor* actor)
