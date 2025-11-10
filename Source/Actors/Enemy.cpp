@@ -15,14 +15,10 @@ Enemy::Enemy(class Game* game, float radius, float speed, float health)
     , mSpeed(speed)
     , mRadius(radius)
     , mWasCritKilled(false)
-    , mExplodesOnDeath(false)
-    , mRangedShooter(false)
-    , mShootEvery(0.0f)
-    , mShootTimer(0.0f)
 {
-    // círculo
+    // círculo simples
     std::vector<Vector2> vertices;
-    int numVertices = 12;
+    const int numVertices = 12;
     for (int i = 0; i < numVertices; ++i)
     {
         float angle = (Math::TwoPi / numVertices) * i;
@@ -36,6 +32,9 @@ Enemy::Enemy(class Game* game, float radius, float speed, float health)
     mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
 
+    // timers de tiro
+    mShootTimer = mShootEvery;
+
     game->AddEnemy(this);
 }
 
@@ -44,99 +43,115 @@ Enemy::~Enemy()
     GetGame()->RemoveEnemy(this);
 }
 
+void Enemy::SetColor(const Vector3& c)
+{
+    if (mDrawComponent) mDrawComponent->SetColor(c);
+}
+
 void Enemy::OnUpdate(float deltaTime)
 {
+    // movimentação geral
     ChasePlayer(deltaTime);
 
-    // Tiros de inimigo (Atirador)
-    if (mRangedShooter && mShootEvery > 0.0f)
-    {
-        mShootTimer += deltaTime;
-        if (mShootTimer >= mShootEvery)
-        {
-            mShootTimer = 0.0f;
-            auto* player = GetGame()->GetPlayer();
-            if (player)
-            {
-                Vector2 from = GetPosition();
-                Vector2 to   = player->GetPosition();
-                Vector2 dir  = to - from;
-                if (dir.LengthSq() > 1e-4f)
-                {
-                    dir.Normalize();
-                    // Nota: usa o Projectile existente (causa dano em inimigos). Para separar,
-                    // crie um EnemyProjectile específico. Para protótipo, mantém assim.
-                    GetGame()->SpawnProjectile(from, dir, 500.0f);
-                }
-            }
-        }
-    }
+    // tiro à distância (somente se marcado como ranged)
+    TryShootAtPlayer(deltaTime);
 
-    // Colisão com projéteis do jogador
+    // colisão com projéteis do jogador
     auto player = GetGame()->GetPlayer();
     if (!player) return;
 
     for (auto projectile : GetGame()->GetProjectiles())
     {
-        if (mCircleColliderComponent->Intersect(*projectile->GetComponent<CircleColliderComponent>()))
+        // projetil do jogador?
+        // A lógica "quem atirou" está no Projectile (flag fromPlayer)
+        auto circle = projectile->GetComponent<CircleColliderComponent>();
+        if (!circle) continue;
+
+        if (mCircleColliderComponent->Intersect(*circle))
         {
-            float baseDamage = 20.0f * player->GetDamageMultiplier();
-
-            bool isCrit = false;
-            if (player->GetCritChance() > 0.0f)
-            {
-                float critRoll = Random::GetFloat();
-                if (critRoll < player->GetCritChance())
-                {
-                    isCrit = true;
-                    baseDamage *= player->GetCritMultiplier();
-                }
-            }
-
-            float damageDealt = TakeDamage(baseDamage);
-
-            if (player->HasLifesteal() && damageDealt > 0.0f)
-            {
-                float healAmount = damageDealt * player->GetLifestealPercent();
-                player->Heal(healAmount);
-            }
-
-            int pierce = player->GetProjectilePierce();
-            if (pierce <= 0)
-            {
-                projectile->SetState(ActorState::Destroy);
-            }
-
-            mWasCritKilled = isCrit;
-            break;
+            // damage do projétil é aplicado dentro do Projectile no acerto do inimigo
+            // Aqui só marcamos que levou dano (Projectile já chama TakeDamage no inimigo?).
+            // Caso a sua implementação do Projectile não chame, mantemos o dano aqui:
+            // (Se já estiver no Projectile, remover este bloco para evitar dano duplo)
         }
     }
 
-    // Morte
+    // morte
     if (mHealth <= 0.0f)
     {
-        if (mWasCritKilled)
-            GetGame()->AddScreenShake(4.0f, 0.15f);
-        else
-            GetGame()->AddScreenShake(2.0f, 0.1f);
-
-        // Explosão em área (gordo/explosivo)
+        // explosão do Gordo Explosivo
         if (mExplodesOnDeath)
         {
-            auto* p = GetGame()->GetPlayer();
-            if (p)
-            {
-                float aoeR = mRadius + 80.0f;
-                if ((p->GetPosition() - GetPosition()).Length() <= aoeR)
-                    p->TakeDamage(25.0f);
-            }
+            DoDeathExplosion();
         }
 
-        if (player) player->AddExperience(10.0f);
+        // XP
+        if (player)
+        {
+            player->AddExperience(mExperienceValue);
+        }
 
         GetGame()->RemoveEnemy(this);
         SetState(ActorState::Destroy);
     }
+}
+
+void Enemy::ChasePlayer(float deltaTime)
+{
+    auto player = GetGame()->GetPlayer();
+    if (!player) return;
+
+    Vector2 playerPos = player->GetPosition();
+    Vector2 enemyPos  = GetPosition();
+    Vector2 dir = playerPos - enemyPos;
+
+    float distance = dir.Length();
+    if (distance > 0.01f)
+    {
+        dir.Normalize();
+        mRigidBodyComponent->SetVelocity(dir * mSpeed);
+    }
+
+    // dano por contato (DPS leve ao encostar)
+    if (distance <= (mRadius + 15.0f))
+    {
+        player->TakeDamage(mDamage * 0.5f * deltaTime); // suaviza por deltaTime
+        GetGame()->AddScreenShake(3.0f, 0.10f);
+    }
+}
+
+void Enemy::TryShootAtPlayer(float deltaTime)
+{
+    if (!mIsRangedShooter) return;
+
+    mShootTimer -= deltaTime;
+    if (mShootTimer > 0.0f) return;
+
+    auto* player = GetGame()->GetPlayer();
+    if (!player) return;
+
+    // direção para o player
+    Vector2 from = GetPosition();
+    Vector2 to   = player->GetPosition();
+    Vector2 dir  = to - from;
+    if (dir.LengthSq() < 1e-4f)
+    {
+        dir = Vector2(1.0f, 0.0f);
+    }
+    else
+    {
+        dir.Normalize();
+    }
+
+    // offset para não nascer em cima do inimigo
+    const float muzzleOffset = mRadius + 6.0f;
+    Vector2 spawnPos = from + dir * muzzleOffset;
+
+    // dispara projétil "do inimigo": fromPlayer = false, dano = mDamage
+    GetGame()->SpawnProjectile(spawnPos, dir, mProjectileSpeed, /*fromPlayer*/ false, /*damage*/ mDamage);
+
+    // reseta timer
+    mShootTimer = mShootEvery;
 }
 
 float Enemy::TakeDamage(float damage)
@@ -147,24 +162,24 @@ float Enemy::TakeDamage(float damage)
     return old - mHealth;
 }
 
-void Enemy::ChasePlayer(float deltaTime)
+void Enemy::DoDeathExplosion()
 {
-    auto player = GetGame()->GetPlayer();
+    // dano em área no jogador (único alvo hoje)
+    auto* player = GetGame()->GetPlayer();
     if (!player) return;
 
-    Vector2 playerPos = player->GetPosition();
-    Vector2 enemyPos  = GetPosition();
-    Vector2 direction = playerPos - enemyPos;
+    Vector2 p = player->GetPosition();
+    Vector2 e = GetPosition();
+    float dist = (p - e).Length();
 
-    float distance = direction.Length();
-    if (distance > 0.01f)
+    if (dist <= mExplosionRadius)
     {
-        direction.Normalize();
-        mRigidBodyComponent->SetVelocity(direction * mSpeed);
+        // escala leve com a distância (opcional)
+        float falloff = 1.0f - Math::Clamp(dist / mExplosionRadius, 0.0f, 1.0f);
+        player->TakeDamage(mExplosionDamage * (0.6f + 0.4f * falloff));
+        GetGame()->AddScreenShake(6.0f, 0.2f);
     }
-}
 
-void Enemy::SetColor(const Vector3& color)
-{
-    if (mDrawComponent) mDrawComponent->SetColor(color);
+    // efeito visual
+    GetGame()->SpawnDeathParticles(e, Vector3(1.0f, 0.5f, 0.2f));
 }

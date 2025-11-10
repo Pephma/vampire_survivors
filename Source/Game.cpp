@@ -238,9 +238,14 @@ void Game::RemoveProjectile(Projectile* projectile)
     }
 }
 
-void Game::SpawnProjectile(const Vector2& position, const Vector2& direction, float speed)
+// AJUSTADO: repassa fromPlayer e damage ao construtor de Projectile
+void Game::SpawnProjectile(const Vector2& position,
+                           const Vector2& direction,
+                           float speed,
+                           bool fromPlayer,
+                           float damage)
 {
-    Projectile* projectile = new Projectile(this, position, direction, speed);
+    Projectile* projectile = new Projectile(this, position, direction, speed, fromPlayer, damage);
 }
 
 void Game::StartNewGame()
@@ -401,11 +406,13 @@ void Game::InitSpawnRules()
     mTimedHordes.clear();
 
     // Regras contínuas (por intervalo)
-    mSpawnRules.push_back({ EnemyKind::Comum,          1,   0.0f,  INF, 0.80f,  2 });
-    mSpawnRules.push_back({ EnemyKind::Corredor,       2,  30.0f,  INF, 1.30f,  2 });
-    mSpawnRules.push_back({ EnemyKind::GordoExplosivo, 3,  60.0f,  INF, 2.40f,  1 });
-    mSpawnRules.push_back({ EnemyKind::Atirador,       4,  90.0f,  INF, 4.50f,  1 });
-
+    mSpawnRules.push_back({ EnemyKind::Comum, 1,    0.0f,  INFINITY, 0.70f,  2 });
+    // Fast entram a partir da wave 3
+    mSpawnRules.push_back({ EnemyKind::Corredor,  3,   20.0f,  INFINITY, 1.20f,  3 });
+    // Tanks a partir da wave 5
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  5,   60.0f,  INFINITY, 2.50f,  1 });
+    // Elites espaçados a partir da wave 7
+    mSpawnRules.push_back({ EnemyKind::Atirador, 7,  120.0f,  INFINITY, 8.00f,  1 });
     mRuleTimers.resize(mSpawnRules.size(), 0.0f);
 
     // Hordas pontuais (burst em tempos específicos)
@@ -415,79 +422,75 @@ void Game::InitSpawnRules()
     mTimedHordes.push_back({ 240.0f, EnemyKind::Atirador,       6, 4, false });
 }
 
-void Game::SpawnEnemyOfKind(EnemyKind kind)
+void Game::SpawnEnemyOfKind(EnemyKind kind, int count)
 {
     if (!mPlayer) return;
 
-    // spawn em anel ao redor do player
     Vector2 playerPos = mPlayer->GetPosition();
-    float spawnDistance = 350.0f + Random::GetFloatRange(-50.0f, 50.0f);
-    float angle = Random::GetFloatRange(0.0f, Math::TwoPi);
 
-    Vector2 spawnPos(
-        playerPos.x + Math::Cos(angle) * spawnDistance,
-        playerPos.y + Math::Sin(angle) * spawnDistance
-    );
-
-    // Clamp no mundo
-    const float radiusClamp = 25.0f;
-    spawnPos.x = Math::Clamp(spawnPos.x, radiusClamp, (float)WORLD_WIDTH  - radiusClamp);
-    spawnPos.y = Math::Clamp(spawnPos.y, radiusClamp, (float)WORLD_HEIGHT - radiusClamp);
-
-    // Escala por wave
-    const float w = (float)mCurrentWave;
-
-    float radius = 12.0f + (w * 0.4f);
-    float speed  = 70.0f  + (w * 2.0f);
-    float health = 25.0f  + (w * 6.0f);
-    Vector3 color(0.9f, 0.1f, 0.1f); // básico: vermelho
-
-    // flags de comportamento especiais
-    bool explodesOnDeath = false;
-    bool rangedShooter   = false;
-    float shootEvery     = 0.0f; // 0 = não atira
-
-    switch (kind)
+    for (int i = 0; i < count; ++i)
     {
-        case EnemyKind::Comum:
-            // base
-            break;
-        case EnemyKind::Corredor:
-            speed  *= 1.8f;
-            radius *= 0.9f;
-            health *= 0.8f;
-            color = Vector3(1.0f, 0.6f, 0.2f); // laranja
-            break;
-        case EnemyKind::GordoExplosivo:
-            speed  *= 0.6f;
-            radius *= 1.4f;
-            health *= 3.0f;
-            color = Vector3(0.3f, 0.9f, 0.3f); // verde
-            explodesOnDeath = true;
-            break;
-        case EnemyKind::Atirador:
-            speed  *= 0.9f;
-            radius *= 1.05f;
-            health *= 1.6f;
-            color = Vector3(0.6f, 0.4f, 1.0f); // roxo
-            rangedShooter = true;
-            shootEvery = 2.6f;
-            break;
+        // Posição inicial aleatória ao redor do jogador
+        Vector2 spawnPos;
+        float distance = 350.0f + Random::GetFloatRange(-50.0f, 50.0f);
+        float angle = Random::GetFloatRange(0.0f, Math::TwoPi);
+        spawnPos.x = playerPos.x + Math::Cos(angle) * distance;
+        spawnPos.y = playerPos.y + Math::Sin(angle) * distance;
+
+        // Garante que o inimigo nasce dentro dos limites do mapa
+        float radius = 20.0f;
+        spawnPos.x = Math::Clamp(spawnPos.x, radius, (float)WORLD_WIDTH - radius);
+        spawnPos.y = Math::Clamp(spawnPos.y, radius, (float)WORLD_HEIGHT - radius);
+
+        // Atributos base que escalam com a wave
+        float baseHealth = 25.0f + mCurrentWave * 8.0f;
+        float baseSpeed  = 70.0f + mCurrentWave * 3.0f;
+        float baseRadius = 12.0f + mCurrentWave * 0.5f;
+
+        // Cria inimigo e aplica atributos conforme o tipo
+        Enemy* e = new Enemy(this, baseRadius, baseSpeed, baseHealth);
+
+        switch (kind)
+        {
+            case EnemyKind::Comum:
+                e->SetColor(Vector3(0.9f, 0.1f, 0.1f));
+                e->SetDamage(10.0f);
+                e->SetExperienceValue(10.0f);
+                break;
+
+            case EnemyKind::Corredor:
+                e->SetColor(Vector3(1.0f, 0.5f, 0.2f));
+                e->SetSpeed(250.0f);
+                e->SetDamage(6.0f);
+                e->SetExperienceValue(12.0f);
+                break;
+
+            case EnemyKind::GordoExplosivo:
+                e->SetColor(Vector3(0.7f, 0.3f, 0.3f));
+                e->SetSpeed(60.0f);
+                e->SetExplosionDamage(40.0f);
+                e->SetExplosionRadius(150.0f);
+                e->SetExperienceValue(20.0f);
+                e->SetExplodesOnDeath(true);
+                break;
+
+            case EnemyKind::Atirador:
+                e->SetColor(Vector3(0.2f, 0.6f, 1.0f));
+                e->SetSpeed(50.0f);
+                e->SetProjectileSpeed(500.0f);
+                e->SetShootEvery(2.0f);
+                e->SetExperienceValue(15.0f);
+                e->SetRangedShooter(true, 2.0f);
+                break;
+        }
+
+        e->SetPosition(spawnPos);
     }
-
-    auto* enemy = new Enemy(this, radius, speed, health);
-    enemy->SetPosition(spawnPos);
-    enemy->SetColor(color);
-
-    // Requer setters adicionados em Enemy.h/Enemy.cpp
-    enemy->SetExplodesOnDeath(explodesOnDeath);
-    enemy->SetRangedShooter(rangedShooter, shootEvery);
 }
 
 void Game::SpawnHorde(EnemyKind kind, int count)
 {
-    for (int i = 0; i < count; ++i)
-        SpawnEnemyOfKind(kind);
+    SpawnEnemyOfKind(kind, count);
 }
 
 void Game::UpdateWaveSystem(float deltaTime)
@@ -517,8 +520,9 @@ void Game::UpdateWaveSystem(float deltaTime)
             mRuleTimers[i] += deltaTime;
             while (mRuleTimers[i] >= r.every && (int)mEnemies.size() < maxEnemies)
             {
-                for (int c = 0; c < r.count && (int)mEnemies.size() < maxEnemies; ++c)
-                    SpawnEnemyOfKind(r.kind);
+                int canSpawn = std::min(r.count, maxEnemies - (int)mEnemies.size());
+                if (canSpawn > 0)
+                    SpawnEnemyOfKind(r.kind, canSpawn);
 
                 mRuleTimers[i] -= r.every;
             }

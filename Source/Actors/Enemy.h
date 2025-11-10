@@ -1,5 +1,7 @@
 #pragma once
 #include "Actor.h"
+#include "../Game.h"
+
 
 class Enemy : public Actor
 {
@@ -8,31 +10,66 @@ public:
     ~Enemy();
 
     void OnUpdate(float deltaTime) override;
-    float TakeDamage(float damage);
+
+    // --- getters básicos ---
     float GetHealth() const { return mHealth; }
     float GetRadius() const { return mRadius; }
 
-    // ========= NOVOS MÉTODOS =========
-    void SetColor(const Vector3& color);
+    // --- atributos expostos/setters usados pelo Game ---
+    void SetSpeed(float s) { mSpeed = s; }
+    void SetDamage(float d) { mDamage = d; }
+    void SetExperienceValue(float xp) { mExperienceValue = xp; }
+
     void SetExplodesOnDeath(bool v) { mExplodesOnDeath = v; }
-    void SetRangedShooter(bool v, float every = 0.0f) { mRangedShooter = v; mShootEvery = every; }
-    // =================================
+    void SetExplosionDamage(float d) { mExplosionDamage = d; }
+    void SetExplosionRadius(float r) { mExplosionRadius = r; }
+
+    void SetRangedShooter(bool v, float shootEvery)
+    {
+        mIsRangedShooter = v;
+        mShootEvery = shootEvery;
+        if (mShootEvery < 0.1f) mShootEvery = 0.1f;
+    }
+    void SetShootEvery(float s) { mShootEvery = (s < 0.1f ? 0.1f : s); }
+    void SetProjectileSpeed(float v) { mProjectileSpeed = v; }
+
+    // util
+    void SetColor(const Vector3& c);
+
+    // dano recebido retorna quanto foi de fato aplicado
+    float TakeDamage(float damage);
 
 private:
+    // comportamento
+    void ChasePlayer(float deltaTime);
+    void TryShootAtPlayer(float deltaTime);
+    void DoDeathExplosion(); // usado para o Gordo Explosivo
+
+    // stats
     float mHealth;
     float mMaxHealth;
     float mSpeed;
     float mRadius;
+
+    // novo: combate
+    float mDamage = 10.0f;          // dano por contato ou base para inimigos
+    float mExperienceValue = 10.0f; // XP dado ao morrer
+
+    // explosão (Gordo Explosivo)
+    bool  mExplodesOnDeath = false;
+    float mExplosionDamage = 40.0f;
+    float mExplosionRadius = 150.0f;
+
+    // ataque à distância (Atirador)
+    bool  mIsRangedShooter = false;
+    float mShootEvery = 2.0f;     // intervalo entre tiros
+    float mShootTimer = 0.0f;     // contador regressivo
+    float mProjectileSpeed = 500.0f;
+
     bool mWasCritKilled;
 
-    bool  mExplodesOnDeath = false;
-    bool  mRangedShooter   = false;
-    float mShootEvery      = 0.0f;
-    float mShootTimer      = 0.0f;
-
+    // componentes
     class DrawComponent* mDrawComponent;
     class RigidBodyComponent* mRigidBodyComponent;
     class CircleColliderComponent* mCircleColliderComponent;
-
-    void ChasePlayer(float deltaTime);
 };

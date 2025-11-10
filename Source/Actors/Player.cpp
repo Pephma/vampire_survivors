@@ -38,64 +38,46 @@ Player::Player(class Game* game)
     , mExperienceToNextLevel(100.0f)
     , mLevel(1)
 {
-    // Create a simple character shape (circle with a small triangle on top for direction)
+    // Shape do player
     float radius = 15.0f;
     std::vector<Vector2> vertices;
-    
-    // Create circular body - use enough vertices for a visible circle
+
     int numVertices = 16;
     for (int i = 0; i < numVertices; ++i)
     {
         float angle = (Math::TwoPi / numVertices) * i;
         vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
     }
-    
-    // Add a small triangle pointing up to show direction
+
+    // Triângulo para indicar direção
     vertices.emplace_back(Vector2(0.0f, radius + 8.0f));
     vertices.emplace_back(Vector2(-5.0f, radius));
     vertices.emplace_back(Vector2(5.0f, radius));
-    
+
     mDrawComponent = new DrawComponent(this, vertices);
-    // Super cool player color - bright cyan with glow
-    Vector3 playerColor = Vector3(0.0f, 1.0f, 1.0f); // Bright cyan
-    mDrawComponent->SetColor(playerColor);
-    mDrawComponent->SetFilled(true); // Filled for better visibility
+    mDrawComponent->SetColor(Vector3(0.0f, 1.0f, 1.0f)); // ciano
+    mDrawComponent->SetFilled(true);
+
     mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
-    
-    // Don't rotate player - we move in direction instead
+
     SetRotation(0.0f);
 }
 
 void Player::OnProcessInput(const Uint8* state)
 {
     Vector2 moveDirection(0.0f, 0.0f);
-    
-    // WASD movement
-    if (state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP])
-    {
-        moveDirection.y -= 1.0f;
-    }
-    if (state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN])
-    {
-        moveDirection.y += 1.0f;
-    }
-    if (state[SDL_SCANCODE_A] || state[SDL_SCANCODE_LEFT])
-    {
-        moveDirection.x -= 1.0f;
-    }
-    if (state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT])
-    {
-        moveDirection.x += 1.0f;
-    }
-    
-    // Normalize diagonal movement
+
+    if (state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP])    moveDirection.y -= 1.0f;
+    if (state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN])  moveDirection.y += 1.0f;
+    if (state[SDL_SCANCODE_A] || state[SDL_SCANCODE_LEFT])  moveDirection.x -= 1.0f;
+    if (state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT]) moveDirection.x += 1.0f;
+
     if (moveDirection.LengthSq() > 0.01f)
     {
         moveDirection.Normalize();
         mRigidBodyComponent->SetVelocity(moveDirection * mMoveSpeed);
-        
-        // Rotate character to face movement direction
+
         float angle = Math::Atan2(moveDirection.y, moveDirection.x) + Math::PiOver2;
         SetRotation(angle);
     }
@@ -108,57 +90,54 @@ void Player::OnProcessInput(const Uint8* state)
 void Player::OnUpdate(float deltaTime)
 {
     UpdateAutoAttack(deltaTime);
-    
-    // Update orbital weapons
+
+    // Orbitais (estético/jogabilidade)
     if (mOrbitalWeapons)
     {
-        mOrbitalAngle += deltaTime * 3.0f; // Rotate orbitals
-        if (mOrbitalAngle > Math::TwoPi)
-            mOrbitalAngle -= Math::TwoPi;
-        
-        // Spawn orbital projectiles that orbit around player
+        mOrbitalAngle += deltaTime * 3.0f;
+        if (mOrbitalAngle > Math::TwoPi) mOrbitalAngle -= Math::TwoPi;
+
         Vector2 playerPos = GetPosition();
         float orbitRadius = 40.0f;
         static float orbitalTimer = 0.0f;
         orbitalTimer += deltaTime;
-        if (orbitalTimer > 0.3f) // Spawn orbitals periodically
+        if (orbitalTimer > 0.3f)
         {
             for (int i = 0; i < mOrbitalCount; ++i)
             {
                 float angle = mOrbitalAngle + (Math::TwoPi / mOrbitalCount) * i;
                 Vector2 orbitalPos = playerPos + Vector2(Math::Cos(angle) * orbitRadius, Math::Sin(angle) * orbitRadius);
-                Vector2 tangentDir(-Math::Sin(angle), Math::Cos(angle)); // Perpendicular to radius
-                GetGame()->SpawnProjectile(orbitalPos, tangentDir, 400.0f * mDamageMultiplier);
+                Vector2 tangentDir(-Math::Sin(angle), Math::Cos(angle)); // tangente
+                // offset já está aplicado por nascer no perímetro do círculo orbital
+                GetGame()->SpawnProjectile(orbitalPos, tangentDir, 400.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 16.0f * mDamageMultiplier);
             }
             orbitalTimer = 0.0f;
         }
     }
-    
-    // Health regen
+
+    // Regen
     if (mHasHealthRegen && mHealth < mMaxHealth)
     {
         Heal(mHealthRegenRate * deltaTime);
     }
-    
-    // Check collision with enemies
+
+    // Dano por contato com inimigos
     for (auto enemy : GetGame()->GetEnemies())
     {
         if (mCircleColliderComponent->Intersect(*enemy->GetComponent<CircleColliderComponent>()))
         {
-            TakeDamage(10.0f * deltaTime); // Damage over time on collision
-            // Screen shake on taking damage
+            TakeDamage(10.0f * deltaTime);
             GetGame()->AddScreenShake(5.0f, 0.15f);
             break;
         }
     }
-    
-    // Check if player is dead
+
     if (mHealth <= 0.0f)
     {
         GetGame()->GameOver();
     }
-    
-    // Keep player in world bounds
+
+    // Limites do mundo
     Vector2 pos = GetPosition();
     float radius = 15.0f;
     if (pos.x < radius) pos.x = radius;
@@ -173,13 +152,22 @@ void Player::TakeDamage(float damage)
     mHealth -= damage;
     if (mHealth < 0.0f)
         mHealth = 0.0f;
+
+    // ✅ Garantia extra: se zerou a vida, finaliza o jogo imediatamente
+    if (mHealth <= 0.0f)
+    {
+        if (GetGame()->GetState() == MenuState::Playing)
+        {
+            GetGame()->GameOver();
+        }
+    }
 }
+
 
 void Player::Heal(float amount)
 {
     mHealth += amount;
-    if (mHealth > mMaxHealth)
-        mHealth = mMaxHealth;
+    if (mHealth > mMaxHealth) mHealth = mMaxHealth;
 }
 
 void Player::AddExperience(float exp)
@@ -189,11 +177,9 @@ void Player::AddExperience(float exp)
     {
         mExperience -= mExperienceToNextLevel;
         mLevel++;
-        mExperienceToNextLevel *= 1.5f; // Exponential growth
-        
-        // Screen shake on level up for epic feel!
+        mExperienceToNextLevel *= 1.5f;
+
         GetGame()->AddScreenShake(8.0f, 0.3f);
-        
         GetGame()->ShowUpgradeMenu();
     }
 }
@@ -201,108 +187,115 @@ void Player::AddExperience(float exp)
 void Player::UpdateAutoAttack(float deltaTime)
 {
     mAttackCooldown -= deltaTime;
-    
-    if (mAttackCooldown <= 0.0f)
+
+    if (mAttackCooldown > 0.0f) return;
+
+    // Recarrega cooldown
+    float baseCooldown = 0.5f / mAttackSpeedMultiplier;
+    mAttackCooldown = baseCooldown;
+
+    Vector2 playerPos = GetPosition();
+    const float playerRadius = 15.0f + 10.0f;       // distância mínima do corpo
+    const float baseSpeed   = 800.0f;               // velocidade padrão do projétil
+    const float baseDamage  = 20.0f * mDamageMultiplier;
+
+    // 1) Shotgun
+    if (mShotgunMode)
     {
-        float baseCooldown = 0.5f / mAttackSpeedMultiplier;
-        mAttackCooldown = baseCooldown;
-        
-        Vector2 playerPos = GetPosition();
-        
-        // Different attack patterns based on weapon modes
-        if (mShotgunMode)
+        int numProjectiles = mProjectileCount;
+        float totalSpread = Math::Pi; // 180°
+        for (int i = 0; i < numProjectiles; ++i)
         {
-            // Shotgun: Wide spread pattern
-            int numProjectiles = mProjectileCount;
-            float totalSpread = Math::Pi; // 180 degree spread
-            for (int i = 0; i < numProjectiles; ++i)
-            {
-                float angle = (totalSpread / (numProjectiles - 1)) * i - totalSpread / 2.0f;
-                Vector2 direction(Math::Cos(angle), Math::Sin(angle));
-                Vector2 offset = direction * (15.0f + 10.0f);
-                GetGame()->SpawnProjectile(playerPos + offset, direction, 1200.0f * mDamageMultiplier);
-            }
+            float angle = (totalSpread / (numProjectiles - 1)) * i - totalSpread / 2.0f;
+            Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+            dir.Normalize();
+            Vector2 offset = dir * playerRadius;
+            GetGame()->SpawnProjectile(playerPos + offset, dir, 1200.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 12.0f * mDamageMultiplier);
         }
-        else if (mSpiralMode)
+        return;
+    }
+
+    // 2) Espiral
+    if (mSpiralMode)
+    {
+        static float spiralAngle = 0.0f;
+        spiralAngle += 0.5f;
+        int numProjectiles = mProjectileCount;
+        for (int i = 0; i < numProjectiles; ++i)
         {
-            // Spiral: Rotating spiral pattern
-            static float spiralAngle = 0.0f;
-            spiralAngle += 0.5f; // Rotate spiral
-            int numProjectiles = mProjectileCount;
-            for (int i = 0; i < numProjectiles; ++i)
-            {
-                float angle = spiralAngle + (Math::TwoPi / numProjectiles) * i;
-                Vector2 direction(Math::Cos(angle), Math::Sin(angle));
-                Vector2 offset = direction * (15.0f + 10.0f);
-                GetGame()->SpawnProjectile(playerPos + offset, direction, 800.0f * mDamageMultiplier);
-            }
+            float angle = spiralAngle + (Math::TwoPi / numProjectiles) * i;
+            Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+            dir.Normalize();
+            Vector2 offset = dir * playerRadius;
+            GetGame()->SpawnProjectile(playerPos + offset, dir, 800.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 16.0f * mDamageMultiplier);
         }
-        else
+        return;
+    }
+
+    // 3) Padrão: mira no inimigo mais próximo; se não houver, atira em todas direções
+    Enemy* nearestEnemy = nullptr;
+    float nearestDistance = 10000.0f;
+
+    for (auto enemy : GetGame()->GetEnemies())
+    {
+        float dist = (enemy->GetPosition() - playerPos).Length();
+        if (dist < nearestDistance)
         {
-            // Default: Target nearest enemy or all directions
-            Enemy* nearestEnemy = nullptr;
-            float nearestDistance = 10000.0f;
-            
-            for (auto enemy : GetGame()->GetEnemies())
-            {
-                Vector2 enemyPos = enemy->GetPosition();
-                Vector2 diff = enemyPos - playerPos;
-                float distance = diff.Length();
-                
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestEnemy = enemy;
-                }
-            }
-            
-            if (nearestEnemy)
-            {
-                Vector2 enemyPos = nearestEnemy->GetPosition();
-                Vector2 direction = enemyPos - playerPos;
-                direction.Normalize();
-                
-                float playerRadius = 15.0f + 10.0f;
-                Vector2 spawnOffset = direction * playerRadius;
-                
-                int numProjectiles = mProjectileCount;
-                float spreadAngle = 0.3f;
-                
-                for (int i = 0; i < numProjectiles; ++i)
-                {
-                    float angleOffset = ((i - numProjectiles / 2.0f) / numProjectiles) * spreadAngle;
-                    float currentAngle = Math::Atan2(direction.y, direction.x) + angleOffset;
-                    Vector2 projectileDirection(Math::Cos(currentAngle), Math::Sin(currentAngle));
-                    
-                    GetGame()->SpawnProjectile(playerPos + spawnOffset, projectileDirection, 800.0f * mDamageMultiplier);
-                }
-                
-                // Reverse shot: Also shoot backwards
-                if (mReverseShot)
-                {
-                    Vector2 reverseDir = direction * -1.0f;
-                    Vector2 reverseOffset = spawnOffset * -1.0f;
-                    GetGame()->SpawnProjectile(playerPos + reverseOffset, reverseDir, 800.0f * mDamageMultiplier);
-                }
-                
-                // Rotate character to face nearest enemy
-                float angle = Math::Atan2(direction.y, direction.x) + Math::PiOver2;
-                SetRotation(angle);
-            }
-            else
-            {
-                // No enemies nearby, shoot in all directions
-                float playerRadius = 15.0f + 10.0f;
-                int numProjectiles = mProjectileCount;
-                for (int i = 0; i < numProjectiles; ++i)
-                {
-                    float angle = (Math::TwoPi / numProjectiles) * i;
-                    Vector2 direction(Math::Cos(angle), Math::Sin(angle));
-                    Vector2 offset = direction * playerRadius;
-                    
-                    GetGame()->SpawnProjectile(playerPos + offset, direction, 800.0f * mDamageMultiplier);
-                }
-            }
+            nearestDistance = dist;
+            nearestEnemy = enemy;
+        }
+    }
+
+    if (nearestEnemy)
+    {
+        Vector2 toEnemy = nearestEnemy->GetPosition() - playerPos;
+        if (toEnemy.LengthSq() < 1e-6f) toEnemy = Vector2(1.0f, 0.0f);
+        toEnemy.Normalize();
+
+        Vector2 spawnOffset = toEnemy * playerRadius;
+
+        int numProjectiles = mProjectileCount;
+        float spreadAngle = 0.3f; // ~17°
+
+        // Conjunto “leque” em torno do alvo
+        for (int i = 0; i < numProjectiles; ++i)
+        {
+            float angleOffset = ((i - numProjectiles / 2.0f) / std::max(1, numProjectiles - 1)) * spreadAngle;
+            float baseAngle = Math::Atan2(toEnemy.y, toEnemy.x);
+            float current = baseAngle + angleOffset;
+
+            Vector2 dir(Math::Cos(current), Math::Sin(current));
+            dir.Normalize();
+
+            Vector2 offset = dir * playerRadius;
+            GetGame()->SpawnProjectile(playerPos + offset, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage);
+        }
+
+        // Reverse Shot opcional
+        if (mReverseShot)
+        {
+            Vector2 reverseDir = toEnemy * -1.0f;
+            reverseDir.Normalize();
+            Vector2 reverseOffset = reverseDir * playerRadius;
+            GetGame()->SpawnProjectile(playerPos + reverseOffset, reverseDir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage * 0.8f);
+        }
+
+        // gira o player para o alvo
+        float angle = Math::Atan2(toEnemy.y, toEnemy.x) + Math::PiOver2;
+        SetRotation(angle);
+    }
+    else
+    {
+        // Sem inimigos: círculo completo
+        int numProjectiles = mProjectileCount;
+        for (int i = 0; i < numProjectiles; ++i)
+        {
+            float angle = (Math::TwoPi / numProjectiles) * i;
+            Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+            dir.Normalize();
+
+            Vector2 offset = dir * playerRadius;
+            GetGame()->SpawnProjectile(playerPos + offset, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage);
         }
     }
 }

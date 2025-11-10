@@ -27,7 +27,6 @@ struct TimedHorde {
 };
 // ============================================
 
-
 enum class MenuState
 {
     MainMenu,
@@ -51,7 +50,7 @@ public:
     // NOVAS FUNÇÕES PARA O SPAWN SYSTEM
     // --------------------------------
     void InitSpawnRules();
-    void SpawnEnemyOfKind(EnemyKind kind);
+    void SpawnEnemyOfKind(EnemyKind kind, int count);
     void SpawnHorde(EnemyKind kind, int count);
     // --------------------------------
 
@@ -102,7 +101,12 @@ public:
     int GetCurrentWave() const { return mCurrentWave; }
     float GetWaveTimer() const { return mWaveTimer; }
 
-    void SpawnProjectile(const Vector2& position, const Vector2& direction, float speed);
+    // AJUSTADO: suporta projétil de inimigo e dano customizado
+    void SpawnProjectile(const Vector2& position,
+                         const Vector2& direction,
+                         float speed,
+                         bool fromPlayer = true,
+                         float damage = 10.0f);
 
 private:
     void ProcessInput();
