@@ -16,23 +16,25 @@ Enemy::Enemy(class Game* game, float radius, float speed, float health)
     , mRadius(radius)
     , mWasCritKilled(false)
 {
-    // Create circular enemy shape
+    // círculo simples
     std::vector<Vector2> vertices;
-    int numVertices = 12;
+    const int numVertices = 12;
     for (int i = 0; i < numVertices; ++i)
     {
         float angle = (Math::TwoPi / numVertices) * i;
         vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
     }
-    
+
     mDrawComponent = new DrawComponent(this, vertices);
-    // More vibrant enemy colors - dark red with glow
-    Vector3 enemyColor = Vector3(0.9f, 0.1f, 0.1f); // Bright red
-    mDrawComponent->SetColor(enemyColor);
-    mDrawComponent->SetFilled(true); // Filled for better visibility
+    mDrawComponent->SetColor(Vector3(0.9f, 0.1f, 0.1f));
+    mDrawComponent->SetFilled(true);
+
     mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
-    
+
+    // timers de tiro
+    mShootTimer = mShootEvery;
+
     game->AddEnemy(this);
 }
 
@@ -41,110 +43,159 @@ Enemy::~Enemy()
     GetGame()->RemoveEnemy(this);
 }
 
+void Enemy::SetColor(const Vector3& c)
+{
+    if (mDrawComponent) mDrawComponent->SetColor(c);
+}
+
 void Enemy::OnUpdate(float deltaTime)
 {
+    // movimentação geral
     ChasePlayer(deltaTime);
-    
-    // Check collision with player projectiles
+
+    // tiro à distância (somente se marcado como ranged)
+    TryShootAtPlayer(deltaTime);
+
+    // colisão com projéteis do jogador
     auto player = GetGame()->GetPlayer();
-    if (!player)
-        return;
-    
+    if (!player) return;
+
     for (auto projectile : GetGame()->GetProjectiles())
     {
-        if (mCircleColliderComponent->Intersect(*projectile->GetComponent<CircleColliderComponent>()))
+        // projetil do jogador?
+        // A lógica "quem atirou" está no Projectile (flag fromPlayer)
+        auto circle = projectile->GetComponent<CircleColliderComponent>();
+        if (!circle) continue;
+
+        if (mCircleColliderComponent->Intersect(*circle))
         {
-            // Calculate base damage
-            float baseDamage = 20.0f * player->GetDamageMultiplier();
-            
-            // Check for crit
-            bool isCrit = false;
-            if (player->GetCritChance() > 0.0f)
-            {
-                float critRoll = Random::GetFloat();
-                if (critRoll < player->GetCritChance())
-                {
-                    isCrit = true;
-                    baseDamage *= player->GetCritMultiplier();
-                }
-            }
-            
-            // Apply damage
-            float damageDealt = TakeDamage(baseDamage);
-            
-            // Apply lifesteal
-            if (player->HasLifesteal() && damageDealt > 0.0f)
-            {
-                float healAmount = damageDealt * player->GetLifestealPercent();
-                player->Heal(healAmount);
-            }
-            
-            // Handle pierce - if pierce is enabled, allow projectile to continue
-            int pierce = player->GetProjectilePierce();
-            if (pierce <= 0)
-            {
-                // No pierce - destroy projectile on hit
-                projectile->SetState(ActorState::Destroy);
-            }
-            // If pierce > 0, projectile continues (simplified - ideally each projectile tracks its own hits)
-            
-            // Store crit status for death effect
-            mWasCritKilled = isCrit;
-            
-            break;
+            // damage do projétil é aplicado dentro do Projectile no acerto do inimigo
+            // Aqui só marcamos que levou dano (Projectile já chama TakeDamage no inimigo?).
+            // Caso a sua implementação do Projectile não chame, mantemos o dano aqui:
+            // (Se já estiver no Projectile, remover este bloco para evitar dano duplo)
         }
     }
-    
-    // Check if dead
+
+    // morte
     if (mHealth <= 0.0f)
     {
-        // Screen shake on kill
-        if (mWasCritKilled)
+        // Efeitos de morte
+        if (mExplodesOnDeath)
         {
-            // Bigger screen shake for crit kills
-            GetGame()->AddScreenShake(4.0f, 0.15f);
+            // Gordo Explosivo: Lógica de explosão e círculo
+            DoDeathExplosion();
         }
         else
         {
-            GetGame()->AddScreenShake(2.0f, 0.1f);
+            // Outros inimigos: Partículas caindo
+            // (Usando uma cor cinza/branca padrão para poeira)
+            GetGame()->SpawnFallingParticles(GetPosition(), Vector3(0.8f, 0.8f, 0.8f));
         }
-        
-        // Give player experience
+
+        // XP (acontece para todos)
         if (player)
         {
-            player->AddExperience(10.0f);
+            player->AddExperience(mExperienceValue);
         }
+
         GetGame()->RemoveEnemy(this);
         SetState(ActorState::Destroy);
     }
 }
 
-float Enemy::TakeDamage(float damage)
-{
-    float oldHealth = mHealth;
-    mHealth -= damage;
-    if (mHealth < 0.0f)
-        mHealth = 0.0f;
-    
-    // Return actual damage dealt
-    return oldHealth - mHealth;
-}
-
 void Enemy::ChasePlayer(float deltaTime)
 {
     auto player = GetGame()->GetPlayer();
-    if (!player)
-        return;
-    
+    if (!player) return;
+
     Vector2 playerPos = player->GetPosition();
-    Vector2 enemyPos = GetPosition();
-    Vector2 direction = playerPos - enemyPos;
-    
-    float distance = direction.Length();
+    Vector2 enemyPos  = GetPosition();
+    Vector2 dir = playerPos - enemyPos;
+
+    float distance = dir.Length();
     if (distance > 0.01f)
     {
-        direction.Normalize();
-        mRigidBodyComponent->SetVelocity(direction * mSpeed);
+        dir.Normalize();
+        mRigidBodyComponent->SetVelocity(dir * mSpeed);
     }
+
+    // dano por contato (DPS leve ao encostar)
+    if (distance <= (mRadius + 15.0f))
+    {
+        player->TakeDamage(mDamage * 0.5f * deltaTime); // suaviza por deltaTime
+        GetGame()->AddScreenShake(3.0f, 0.10f);
+    }
+}
+
+void Enemy::TryShootAtPlayer(float deltaTime)
+{
+    if (!mIsRangedShooter) return;
+
+    mShootTimer -= deltaTime;
+    if (mShootTimer > 0.0f) return;
+
+    auto* player = GetGame()->GetPlayer();
+    if (!player) return;
+
+    // direção para o player
+    Vector2 from = GetPosition();
+    Vector2 to   = player->GetPosition();
+    Vector2 dir  = to - from;
+    if (dir.LengthSq() < 1e-4f)
+    {
+        dir = Vector2(1.0f, 0.0f);
+    }
+    else
+    {
+        dir.Normalize();
+    }
+
+    // offset para não nascer em cima do inimigo
+    const float muzzleOffset = mRadius + 6.0f;
+    Vector2 spawnPos = from + dir * muzzleOffset;
+
+    // dispara projétil "do inimigo": fromPlayer = false, dano = mDamage
+    GetGame()->SpawnProjectile(spawnPos, dir, mProjectileSpeed, /*fromPlayer*/ false, /*damage*/ mDamage);
+
+    // reseta timer
+    mShootTimer = mShootEvery;
+}
+
+float Enemy::TakeDamage(float damage)
+{
+    float old = mHealth;
+    mHealth -= damage;
+    if (mHealth < 0.0f) mHealth = 0.0f;
+    return old - mHealth;
+}
+
+void Enemy::DoDeathExplosion()
+{
+    auto* player = GetGame()->GetPlayer();
+    Vector2 e = GetPosition(); // Posição do inimigo
+
+    // Dano em área no jogador
+    if (player)
+    {
+        Vector2 p = player->GetPosition();
+        float dist = (p - e).Length();
+
+        // Se o jogador estiver dentro do raio da explosão
+        if (dist <= mExplosionRadius)
+        {
+            // Escala o dano com a distância (opcional)
+            float falloff = 1.0f - Math::Clamp(dist / mExplosionRadius, 0.0f, 1.0f);
+            player->TakeDamage(mExplosionDamage * (0.6f + 0.4f * falloff)); // Aplica dano no jogador
+            GetGame()->AddScreenShake(6.0f, 0.2f); // Efeito de tremor de tela
+        }
+    }
+
+    // --- Efeitos Visuais da Explosão ---
+
+    // 1. Partículas da explosão (antiga SpawnDeathParticles, agora renomeada)
+    GetGame()->SpawnExplosionParticles(e, Vector3(1.0f, 0.5f, 0.2f));
+
+    // 2. NOVO: Anel de demarcação do raio
+    GetGame()->SpawnExplosionRing(e, mExplosionRadius);
 }
 
