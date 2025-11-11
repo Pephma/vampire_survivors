@@ -98,7 +98,6 @@ void Enemy::OnUpdate(float deltaTime)
             player->AddExperience(mExperienceValue);
         }
 
-        GetGame()->RemoveEnemy(this);
         SetState(ActorState::Destroy);
     }
 }

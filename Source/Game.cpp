@@ -320,6 +320,12 @@ void Game::StartNewGame()
     // Reseta a lógica do chefe
     mBosses.clear();
     mLastBossWaveSpawned = 0;
+
+    // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
+    // Spawna o chefe imediatamente (Wave 1, Segundo 1)
+    // SpawnBoss(1);
+    // Avisa o sistema que o chefe da wave 1 já foi
+    // mLastBossWaveSpawned = 1;
     // ----------------------------------------
 }
 
@@ -538,7 +544,7 @@ void Game::InitSpawnRules()
     // Fast entram a partir da wave 3
     mSpawnRules.push_back({ EnemyKind::Corredor,  3,   20.0f,  INFINITY, 1.20f,  3 });
     // Tanks a partir da wave 5
-    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  5,   0.0f,  INFINITY, 2.50f,  2 });
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  1,   0.0f,  INFINITY, 2.50f,  10 });
     // Elites espaçados a partir da wave 7
     mSpawnRules.push_back({ EnemyKind::Atirador, 7,  120.0f,  INFINITY, 8.00f,  1 });
     mRuleTimers.resize(mSpawnRules.size(), 0.0f);

@@ -83,6 +83,8 @@ add_executable(${PROJECT_NAME}
         Source/Audio/AudioSystem.h
         Source/Actors/Boss.cpp
         Source/Actors/Boss.h
+        Source/Actors/DelayedExplosion.cpp
+        Source/Actors/DelayedExplosion.h
 )
 
 # Link libraries
