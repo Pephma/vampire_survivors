@@ -140,7 +140,6 @@ void Boss::ChangeState(BossState newState)
             break;
     }
 }
-// --- OnUpdate MODIFICADO ---
 void Boss::OnUpdate(float deltaTime)
 {
     // 1. Lógica de Morte (essencial)
@@ -161,7 +160,6 @@ void Boss::OnUpdate(float deltaTime)
     }
 
     // 2. Lógica de Colisão com Projéteis
-    // (Assumindo que seu Projectile.cpp ou Enemy::OnUpdate cuida disso)
     // ...
 
 
@@ -174,17 +172,12 @@ void Boss::OnUpdate(float deltaTime)
         case BossState::Chasing: UpdateChasing(deltaTime); break;
         case BossState::Cooldown: UpdateCooldown(deltaTime); break;
 
-        // Ataques do Tank
+        // Ataques
         case BossState::BurstAttack: UpdateBurstAttack(deltaTime); break;
+        case BossState::SpiralAttack: UpdateSpiralAttack(deltaTime); break;
         case BossState::Telegraphing: UpdateTelegraphing(deltaTime); break;
         case BossState::Dashing: UpdateDashing(deltaTime); break;
         case BossState::Bombing: UpdateBombing(deltaTime); break;
-
-        // Ataques do Sprayer
-        case BossState::SpiralAttack: UpdateSpiralAttack(deltaTime); break;
-        case BossState::ConeAttack: UpdateConeAttack(deltaTime); break;
-        case BossState::MineLayer: UpdateMineLayer(deltaTime); break;
-        case BossState::FireBeam: UpdateFireBeam(deltaTime); break;
     }
 
     // 4. Mudar de estado se o tempo acabou
@@ -192,27 +185,45 @@ void Boss::OnUpdate(float deltaTime)
     {
         // --- LÓGICA DE MOVIMENTO/PADRÃO BASEADA NO TIPO ---
 
-        // Padrão do TANK
+        // --- Padrão do TANK (MODIFICADO) ---
         if (mKind == BossKind::Tank)
         {
             if (mBossState == BossState::Chasing)
             {
                 // Escolhe o próximo ataque baseado no índice
                 if (mAttackIndex == 0)      ChangeState(BossState::BurstAttack);
-                else if (mAttackIndex == 1) ChangeState(BossState::Telegraphing); // Inicia a sequência do Dash
+                else if (mAttackIndex == 1)
+                {
+                    mAttackCounter = 3; // <-- PREPARA 3 INVESTIDAS
+                    ChangeState(BossState::Telegraphing); // Inicia a primeira investida
+                }
                 else if (mAttackIndex == 2) ChangeState(BossState::Bombing);
 
                 // Avança o índice para o próximo ataque na rotação
                 mAttackIndex = (mAttackIndex + 1) % 3; // Rotação 0, 1, 2
             }
-            // Sequência do Dash
+
+            // --- Início do Loop da Investida ---
             else if (mBossState == BossState::Telegraphing)
             {
-                ChangeState(BossState::Dashing); // Tank faz a investida
+                ChangeState(BossState::Dashing); // Mira -> Corre
             }
-            // Ataques que vão para Cooldown
+            else if (mBossState == BossState::Dashing)
+            {
+                mAttackCounter--; // Investida executada
+                if (mAttackCounter > 0)
+                {
+                    ChangeState(BossState::Telegraphing); // Ainda tem investidas? Mira de novo.
+                }
+                else
+                {
+                    ChangeState(BossState::Cooldown); // Acabou? Descansa.
+                }
+            }
+            // --- Fim do Loop da Investida ---
+
+            // Outros ataques (Burst, Bombing) vão para Cooldown
             else if (mBossState == BossState::BurstAttack ||
-                     mBossState == BossState::Dashing ||
                      mBossState == BossState::Bombing)
             {
                 ChangeState(BossState::Cooldown);
@@ -223,7 +234,7 @@ void Boss::OnUpdate(float deltaTime)
                 ChangeState(BossState::Chasing);
             }
         }
-        // Padrão do SPRAYER (MODIFICADO para ser mais agressivo)
+        // Padrão do SPRAYER (Sem mudança)
         else if (mKind == BossKind::Sprayer)
         {
             if (mBossState == BossState::Chasing)
@@ -234,39 +245,34 @@ void Boss::OnUpdate(float deltaTime)
                 else if (mAttackIndex == 2) ChangeState(BossState::MineLayer);
                 else if (mAttackIndex == 3)
                 {
-                    mAttackCounter = 10; // <-- Prepara 3 tiros de sniper
-                    ChangeState(BossState::Telegraphing); // Inicia o "Sniper Shot"
+                    mAttackCounter = 5; // Prepara 5 tiros de sniper
+                    ChangeState(BossState::Telegraphing);
                 }
 
                 mAttackIndex = (mAttackIndex + 1) % 4; // Rotação 0, 1, 2, 3
             }
-            // --- Início do Loop do Sniper ---
             else if (mBossState == BossState::Telegraphing)
             {
-                ChangeState(BossState::FireBeam); // Mira -> Atira
+                ChangeState(BossState::FireBeam);
             }
             else if (mBossState == BossState::FireBeam)
             {
-                mAttackCounter--; // Tiro disparado
+                mAttackCounter--;
                 if (mAttackCounter > 0)
                 {
-                    ChangeState(BossState::Telegraphing); // Ainda tem tiros? Mira de novo.
+                    ChangeState(BossState::Telegraphing);
                 }
                 else
                 {
-                    ChangeState(BossState::Cooldown); // Acabou? Descansa.
+                    ChangeState(BossState::Cooldown);
                 }
             }
-            // --- Fim do Loop do Sniper ---
-
-            // Outros ataques vão para Cooldown
             else if (mBossState == BossState::SpiralAttack ||
                      mBossState == BossState::ConeAttack ||
                      mBossState == BossState::MineLayer)
             {
                 ChangeState(BossState::Cooldown);
             }
-            // Volta a perseguir
             else if (mBossState == BossState::Spawning || mBossState == BossState::Cooldown)
             {
                 ChangeState(BossState::Chasing);
