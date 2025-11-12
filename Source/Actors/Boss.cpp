@@ -7,7 +7,7 @@
 #include "../Components/CircleColliderComponent.h"
 #include "../Math.h"
 #include "../Random.h"
-#include <algorithm>
+#include <algorithm> // Necessário para std::find
 
 // --- CONSTRUTOR MODIFICADO ---
 Boss::Boss(Game* game, BossKind kind, int waveLevel)
@@ -20,6 +20,7 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
     , mTargetDirection(Vector2::Zero) // Inicializa a direção do dash
     , mAttackIndex(0)                 // Inicializa o índice de rotação de ataques
     , mBossColor(Vector3::One)        // Inicializa a cor base
+    , mAttackCounter(0) // <-- ADICIONE A INICIALIZAÇÃO
 {
     game->AddBoss(this);
     // (Não removemos o inimigo daqui, pois o ~Enemy já faz isso na morte)
@@ -39,7 +40,7 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
             break;
 
         case BossKind::Sprayer:
-            baseHealth = 15000.0f;
+            baseHealth = 15000.0f; // Vida aumentada
             baseSpeed = 70.0f;    // Mais rápido
             baseRadius = 25.0f;    // Um pouco menor
             mBossColor = Vector3(0.1f, 0.9f, 0.5f); // Verde
@@ -54,30 +55,23 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
     // --- CORREÇÃO DO CHEFE INVISÍVEL E TRAVAMENTO (DOUBLE DELETE) ---
 
     // 2. Deleta o DrawComponent antigo (de raio 1.0) que foi criado pelo Enemy()
-
-    // --- ADICIONE ESTE BLOCO PRIMEIRO ---
-    // Encontra e remove o ponteiro do mDrawComponent da lista mComponents do Actor
-    // (mComponents é 'protected' em Actor, então 'Boss' pode acessá-lo)
-    // É crucial fazer isso ANTES de 'delete' para evitar um "double delete"
     auto iter = std::find(mComponents.begin(), mComponents.end(), mDrawComponent);
     if (iter != mComponents.end())
     {
         mComponents.erase(iter);
     }
-    // ------------------------------------
-
-    delete mDrawComponent; // <-- Agora é seguro deletar o componente antigo
+    delete mDrawComponent;
 
     // 3. Recria os vértices com o RAIO CORRETO (baseRadius)
     std::vector<Vector2> vertices;
-    const int numVertices = 20; // Mais vértices para um chefe redondo
+    const int numVertices = 20;
     for (int i = 0; i < numVertices; ++i)
     {
         float angle = (Math::TwoPi / numVertices) * i;
         vertices.emplace_back(Vector2(Math::Cos(angle) * baseRadius, Math::Sin(angle) * baseRadius));
     }
 
-    // 4. Cria o NOVO DrawComponent (que se adicionará automaticamente a mComponents)
+    // 4. Cria o NOVO DrawComponent
     mDrawComponent = new DrawComponent(this, vertices);
     mDrawComponent->SetColor(mBossColor); // Aplica a cor do chefe
     mDrawComponent->SetFilled(true);
@@ -106,36 +100,47 @@ void Boss::ChangeState(BossState newState)
             mStateTimer = 2.0f;
             break;
         case BossState::Chasing:
-            mStateTimer = 5.0f; // Persegue por 5 segundos
+            mStateTimer = 5.0f;
             break;
         case BossState::Cooldown:
             mStateTimer = 1.5f;
             break;
 
-        // Ataques do Tank
+            // Ataques do Tank
         case BossState::BurstAttack:
             mStateTimer = 3.0f;
             mAttackSubTimer = 0.0f;
             break;
-        case BossState::Telegraphing:
-            mStateTimer = 1.2f; // Tempo para o jogador reagir ao dash
-            break;
         case BossState::Dashing:
-            mStateTimer = 0.7f; // Duração da investida
+            mStateTimer = 0.7f;
             break;
         case BossState::Bombing:
-            mStateTimer = 3.0f; // Tempo que ele fica parado bombardeando
+            mStateTimer = 3.0f;
             mAttackSubTimer = 0.0f;
             break;
 
-        // Ataque do Sprayer
+            // --- ATAQUES DO SPRAYER (MODIFICADOS) ---
+        case BossState::Telegraphing: // Usado pelo Tank E Sprayer
+            mStateTimer = 0.3f; // <-- TEMPO REDUZIDO (Menos tempo para fugir)
+            break;
         case BossState::SpiralAttack:
             mStateTimer = 5.0f;
             mAttackSubTimer = 0.0f;
             break;
+        case BossState::ConeAttack:
+            mStateTimer = 2.5f; // <-- Duração aumentada (para mais leques)
+            mAttackSubTimer = 0.0f; // Dispara o primeiro leque imediatamente
+            break;
+        case BossState::MineLayer:
+            mStateTimer = 4.0f; // <-- Duração aumentada (para mais bombas)
+            mAttackSubTimer = 0.0f;
+            break;
+        case BossState::FireBeam:
+            mStateTimer = 0.5f;
+            break;
     }
 }
-
+// --- OnUpdate MODIFICADO ---
 void Boss::OnUpdate(float deltaTime)
 {
     // 1. Lógica de Morte (essencial)
@@ -156,6 +161,7 @@ void Boss::OnUpdate(float deltaTime)
     }
 
     // 2. Lógica de Colisão com Projéteis
+    // (Assumindo que seu Projectile.cpp ou Enemy::OnUpdate cuida disso)
     // ...
 
 
@@ -168,12 +174,17 @@ void Boss::OnUpdate(float deltaTime)
         case BossState::Chasing: UpdateChasing(deltaTime); break;
         case BossState::Cooldown: UpdateCooldown(deltaTime); break;
 
-        // Ataques
+        // Ataques do Tank
         case BossState::BurstAttack: UpdateBurstAttack(deltaTime); break;
-        case BossState::SpiralAttack: UpdateSpiralAttack(deltaTime); break;
         case BossState::Telegraphing: UpdateTelegraphing(deltaTime); break;
         case BossState::Dashing: UpdateDashing(deltaTime); break;
         case BossState::Bombing: UpdateBombing(deltaTime); break;
+
+        // Ataques do Sprayer
+        case BossState::SpiralAttack: UpdateSpiralAttack(deltaTime); break;
+        case BossState::ConeAttack: UpdateConeAttack(deltaTime); break;
+        case BossState::MineLayer: UpdateMineLayer(deltaTime); break;
+        case BossState::FireBeam: UpdateFireBeam(deltaTime); break;
     }
 
     // 4. Mudar de estado se o tempo acabou
@@ -192,12 +203,12 @@ void Boss::OnUpdate(float deltaTime)
                 else if (mAttackIndex == 2) ChangeState(BossState::Bombing);
 
                 // Avança o índice para o próximo ataque na rotação
-                mAttackIndex = (mAttackIndex + 1) % 3; // Rotação 0, 1, 2, 0, 1, ...
+                mAttackIndex = (mAttackIndex + 1) % 3; // Rotação 0, 1, 2
             }
             // Sequência do Dash
             else if (mBossState == BossState::Telegraphing)
             {
-                ChangeState(BossState::Dashing);
+                ChangeState(BossState::Dashing); // Tank faz a investida
             }
             // Ataques que vão para Cooldown
             else if (mBossState == BossState::BurstAttack ||
@@ -212,13 +223,54 @@ void Boss::OnUpdate(float deltaTime)
                 ChangeState(BossState::Chasing);
             }
         }
-        // Padrão do SPRAYER
+        // Padrão do SPRAYER (MODIFICADO para ser mais agressivo)
         else if (mKind == BossKind::Sprayer)
         {
-            if (mBossState == BossState::Spawning)      ChangeState(BossState::Chasing);
-            else if (mBossState == BossState::Chasing)  ChangeState(BossState::SpiralAttack);
-            else if (mBossState == BossState::SpiralAttack) ChangeState(BossState::Cooldown);
-            else if (mBossState == BossState::Cooldown) ChangeState(BossState::Chasing);
+            if (mBossState == BossState::Chasing)
+            {
+                // Escolhe o próximo ataque (agora 4 ataques)
+                if (mAttackIndex == 0)      ChangeState(BossState::SpiralAttack);
+                else if (mAttackIndex == 1) ChangeState(BossState::ConeAttack);
+                else if (mAttackIndex == 2) ChangeState(BossState::MineLayer);
+                else if (mAttackIndex == 3)
+                {
+                    mAttackCounter = 10; // <-- Prepara 3 tiros de sniper
+                    ChangeState(BossState::Telegraphing); // Inicia o "Sniper Shot"
+                }
+
+                mAttackIndex = (mAttackIndex + 1) % 4; // Rotação 0, 1, 2, 3
+            }
+            // --- Início do Loop do Sniper ---
+            else if (mBossState == BossState::Telegraphing)
+            {
+                ChangeState(BossState::FireBeam); // Mira -> Atira
+            }
+            else if (mBossState == BossState::FireBeam)
+            {
+                mAttackCounter--; // Tiro disparado
+                if (mAttackCounter > 0)
+                {
+                    ChangeState(BossState::Telegraphing); // Ainda tem tiros? Mira de novo.
+                }
+                else
+                {
+                    ChangeState(BossState::Cooldown); // Acabou? Descansa.
+                }
+            }
+            // --- Fim do Loop do Sniper ---
+
+            // Outros ataques vão para Cooldown
+            else if (mBossState == BossState::SpiralAttack ||
+                     mBossState == BossState::ConeAttack ||
+                     mBossState == BossState::MineLayer)
+            {
+                ChangeState(BossState::Cooldown);
+            }
+            // Volta a perseguir
+            else if (mBossState == BossState::Spawning || mBossState == BossState::Cooldown)
+            {
+                ChangeState(BossState::Chasing);
+            }
         }
     }
 }
@@ -227,19 +279,17 @@ void Boss::OnUpdate(float deltaTime)
 
 void Boss::UpdateSpawning(float deltaTime)
 {
-    // Movimento de entrada (igual para todos)
     mRigidBodyComponent->SetVelocity(Vector2(0.0f, 60.0f));
 }
 
 void Boss::UpdateChasing(float deltaTime)
 {
-    // Perseguição (igual para todos, mas a velocidade é diferente)
     ChasePlayer(deltaTime);
 }
 
 void Boss::UpdateBurstAttack(float deltaTime)
 {
-    // Ataque "Explosão" do Tank
+    // ... (código original do BurstAttack) ...
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
     mAttackSubTimer -= deltaTime;
     if (mAttackSubTimer <= 0.0f)
@@ -258,8 +308,8 @@ void Boss::UpdateBurstAttack(float deltaTime)
 
 void Boss::UpdateSpiralAttack(float deltaTime)
 {
-    // Ataque "Espiral" do Sprayer
-    ChasePlayer(deltaTime * 0.5f); // Persegue LENTAMENTE enquanto atira
+    // ... (código original do SpiralAttack) ...
+    ChasePlayer(deltaTime * 0.5f);
     mAttackSubTimer -= deltaTime;
     if (mAttackSubTimer <= 0.0f)
     {
@@ -273,19 +323,14 @@ void Boss::UpdateSpiralAttack(float deltaTime)
 
 void Boss::UpdateCooldown(float deltaTime)
 {
-    // Fica parado (igual para todos)
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
     mDrawComponent->SetColor(mBossColor); // Garante que a cor volte ao normal
 }
 
-// --- FUNÇÕES DE ATAQUE ADICIONADAS ---
-
 void Boss::UpdateTelegraphing(float deltaTime)
 {
-    // 1. Para de se mover
+    // ... (código original do Telegraphing) ...
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
-
-    // 2. Armazena a direção do jogador (só no primeiro frame deste estado)
     if (mTargetDirection.LengthSq() < 1e-4f)
     {
         auto* player = GetGame()->GetPlayer();
@@ -299,51 +344,117 @@ void Boss::UpdateTelegraphing(float deltaTime)
             mTargetDirection = Vector2(0.0f, 1.0f); // Padrão
         }
     }
-
-    // 3. Efeito visual (piscar)
     float blink = Math::Abs(Math::Sin(mStateTimer * 20.0f));
-    mDrawComponent->SetColor(Vector3(1.0f, blink, blink)); // Pisca em branco/vermelho
+    mDrawComponent->SetColor(Vector3(1.0f, blink, blink));
 }
 
 void Boss::UpdateDashing(float deltaTime)
 {
-    // 1. Reseta a cor (caso tenha piscado)
+    // ... (código original do Dashing) ...
     mDrawComponent->SetColor(mBossColor);
-
-    // 2. Define a velocidade alta na direção armazenada
     if (mRigidBodyComponent->GetVelocity().LengthSq() < 1.0f)
     {
-        mRigidBodyComponent->SetVelocity(mTargetDirection * 800.0f); // Velocidade do Dash
+        mRigidBodyComponent->SetVelocity(mTargetDirection * 800.0f);
     }
-
-    // 3. Reseta a direção para o próximo ataque
     mTargetDirection = Vector2::Zero;
 }
 
 void Boss::UpdateBombing(float deltaTime)
 {
-    // 1. Fica parado
+    // ... (código original do Bombing) ...
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
-
-    // 2. Usa o sub-timer para soltar bombas
     mAttackSubTimer -= deltaTime;
     if (mAttackSubTimer <= 0.0f)
     {
-        mAttackSubTimer = 0.7f; // Solta uma bomba a cada 0.7s
-
+        mAttackSubTimer = 0.7f;
         auto* player = GetGame()->GetPlayer();
         if (player)
         {
-            // Cria uma bomba na posição do jogador
             Vector2 targetPos = player->GetPosition();
-
-            // Adiciona um pequeno desvio aleatório
             targetPos.x += Random::GetFloatRange(-100.0f, 100.0f);
             targetPos.y += Random::GetFloatRange(-100.0f, 100.0f);
-
-            // Cria o ator 'DelayedExplosion'
-            // (game, posição, delay, raio)
             new DelayedExplosion(GetGame(), targetPos, 1.5f, 75.0f);
         }
+    }
+}
+
+// --- FUNÇÕES DE ATAQUE ADICIONADAS ---
+
+void Boss::UpdateConeAttack(float deltaTime)
+{
+    // 1. Para de se mover
+    mRigidBodyComponent->SetVelocity(Vector2::Zero);
+
+    // 2. "Aquecimento"
+    if (mAttackSubTimer > 0.0f) {
+        mAttackSubTimer -= deltaTime;
+        if (mAttackSubTimer <= 0.0f) {
+            // --- HORA DE ATIRAR ---
+            auto* player = GetGame()->GetPlayer();
+            if (!player) return;
+
+            // 1. Pega a direção principal para o jogador
+            Vector2 dirToPlayer = player->GetPosition() - GetPosition();
+            dirToPlayer.Normalize();
+            float baseAngle = Math::Atan2(dirToPlayer.y, dirToPlayer.x);
+
+            // 2. Define o "leque" (5 projéteis)
+            const int numProjectiles = 5;
+            const float spreadAngle = Math::Pi / 8.0f; // Ângulo total (22.5 graus)
+            float startAngle = baseAngle - (spreadAngle / 2.0f);
+            float angleStep = spreadAngle / (numProjectiles - 1);
+
+            for (int i = 0; i < numProjectiles; i++) {
+                float angle = startAngle + (i * angleStep);
+                Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+                GetGame()->SpawnProjectile(GetPosition(), dir, 450.0f, false, 15.0f);
+            }
+            GetGame()->AddScreenShake(3.0f, 0.1f);
+        }
+    }
+}
+
+void Boss::UpdateMineLayer(float deltaTime)
+{
+    // 1. Persegue o jogador (MAIS RÁPIDO)
+    auto* player = GetGame()->GetPlayer();
+    if (player)
+    {
+        Vector2 playerPos = player->GetPosition();
+        Vector2 enemyPos  = GetPosition();
+        Vector2 dir = playerPos - enemyPos;
+
+        float distance = dir.Length();
+        if (distance > 0.01f)
+        {
+            dir.Normalize();
+            // --- ALTERAÇÃO AQUI ---
+            // Use a velocidade normal (mSpeed) multiplicada (ex: 1.5x ou 2x)
+            mRigidBodyComponent->SetVelocity(dir * (mSpeed * 1.5f));
+        }
+    }
+
+    // 2. Usa o sub-timer para soltar bombas (como antes)
+    mAttackSubTimer -= deltaTime;
+    if (mAttackSubTimer <= 0.0f) {
+        mAttackSubTimer = 0.20f; // Solta bombas rápido
+
+        // Cria uma bomba na posição ATUAL do chefe
+        new DelayedExplosion(GetGame(), GetPosition(), 2.0f, 60.0f);
+    }
+}
+
+void Boss::UpdateFireBeam(float deltaTime)
+{
+    // 1. Para de se mover e reseta a cor
+    mRigidBodyComponent->SetVelocity(Vector2::Zero);
+    mDrawComponent->SetColor(mBossColor);
+
+    // 2. Atira (só no primeiro frame deste estado)
+    if (mTargetDirection.LengthSq() > 1e-4f) // Se a mira foi definida
+    {
+        GetGame()->SpawnProjectile(GetPosition(), mTargetDirection, 2000.0f, false, 50.0f); // Tiro rápido e forte!
+        GetGame()->AddScreenShake(5.0f, 0.1f);
+        mTargetDirection = Vector2::Zero; // Reseta a mira
     }
 }

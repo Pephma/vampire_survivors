@@ -323,9 +323,9 @@ void Game::StartNewGame()
 
     // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
     // Spawna o chefe imediatamente (Wave 1, Segundo 1)
-    // SpawnBoss(1);
+    SpawnBoss(10);
     // Avisa o sistema que o chefe da wave 1 já foi
-    // mLastBossWaveSpawned = 1;
+    mLastBossWaveSpawned = 10;
     // ----------------------------------------
 }
 
