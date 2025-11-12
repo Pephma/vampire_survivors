@@ -321,13 +321,9 @@ void Game::StartNewGame()
     mBosses.clear();
     mLastBossWaveSpawned = 0;
 
-    // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
-    // Spawna o chefe imediatamente (Wave 1, Segundo 1)
-    SpawnBoss(1);
-    //para spawnar o boss tank descomentar e adicionar valor 1 e para o boss spray valor 10
-    // Avisa o sistema que o chefe da wave 1 já foi
-    //para spawnar o boss tank descomentar e adicionar valor 1 e para o boss spray valor 10
-    mLastBossWaveSpawned = 1;
+    //para spawnar o boss tank descomentar e adicionar valor 1 ou para o boss spray valor 10 nas 2 linhas seguintes
+    // SpawnBoss(1);
+    // mLastBossWaveSpawned = 1;
     // ----------------------------------------
 }
 
