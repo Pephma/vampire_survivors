@@ -65,7 +65,7 @@ bool Game::Initialize()
         return false;
     }
 
-    mWindow = SDL_CreateWindow("Vampire Survivors", 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
+    mWindow = SDL_CreateWindow("Vampire Survivors", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
     if (!mWindow)
     {
         SDL_Log("Failed to create window: %s", SDL_GetError());

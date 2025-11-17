@@ -90,7 +90,7 @@ private:
     float mExperienceToNextLevel;
     int mLevel;
     
-    class DrawComponent* mDrawComponent;
+    class AnimatorComponent* mAnimatorComponent;
     class RigidBodyComponent* mRigidBodyComponent;
     class CircleColliderComponent* mCircleColliderComponent;
 };

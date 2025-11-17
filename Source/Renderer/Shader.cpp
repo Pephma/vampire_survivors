@@ -50,6 +50,14 @@ void Shader::SetActive() const
 	glUseProgram(mShaderProgram);
 }
 
+void Shader::SetVectorUniform(const char *name, const Vector2 &vector) const {
+    // Find the uniform by this name
+    GLint loc = glGetUniformLocation(mShaderProgram, name);
+
+    // Send the vector data to the uniform
+    glUniform2fv(loc, 1, vector.GetAsFloatPtr());
+}
+
 void Shader::SetVectorUniform(const char* name, const Vector3& vector) const
 {
 
@@ -58,12 +66,34 @@ void Shader::SetVectorUniform(const char* name, const Vector3& vector) const
 	glUniform3fv(loc, 1, vector.GetAsFloatPtr());
 }
 
+void Shader::SetVectorUniform(const char *name, const Vector4 &vector) const {
+    // Find the uniform by this name
+    GLint loc = glGetUniformLocation(mShaderProgram, name);
+
+    // Send the vector data to the uniform
+    glUniform4fv(loc, 1, vector.GetAsFloatPtr());
+}
+
+
 void Shader::SetMatrixUniform(const char* name, const Matrix4& matrix) const
 {
 
 	GLuint loc = glGetUniformLocation(mShaderProgram, name);
 
 	glUniformMatrix4fv(loc, 1, GL_FALSE, matrix.GetAsFloatPtr());
+}
+
+void Shader::SetFloatUniform(const char *name, float value) const {
+    // Find the uniform by this name
+    GLuint loc = glGetUniformLocation(mShaderProgram, name);
+
+    // Send the float data to the uniform
+    glUniform1f(loc, value);
+}
+
+void Shader::SetIntegerUniform(const char *name, int value) const {
+    GLint uTexture = glGetUniformLocation(mFragShader, name);
+    glUniform1i(uTexture, value);
 }
 
 bool Shader::CompileShader(const std::string& fileName, GLenum shaderType, GLuint& outShader)

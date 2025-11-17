@@ -138,6 +138,9 @@ public:
 	{
 	}
 
+    // Cast to a const float pointer
+    const float* GetAsFloatPtr() const { return reinterpret_cast<const float*>(&x); }
+
 	// Set both components in one line
 	void Set(float inX, float inY)
 	{
@@ -625,7 +628,38 @@ public:
 	}
 
 	[[nodiscard]] static Vector4 Transform(const Vector4& vec, const class Matrix4& mat);
+
+    // NOLINTBEGIN
+    static const Vector4 Zero;
+    static const Vector4 One;
+    static const Vector4 UnitX;
+    static const Vector4 UnitY;
+    static const Vector4 UnitZ;
+    static const Vector4 UnitW;
+    static const Vector4 UnitRect;
+    static const Vector4 NegUnitX;
+    static const Vector4 NegUnitY;
+    static const Vector4 NegUnitZ;
+    static const Vector4 NegUnitW;
+    static const Vector4 Infinity;
+    static const Vector4 NegInfinity;
+    // NOLINTEND
 };
+
+inline constexpr Vector4 Vector4::Zero(0.0f, 0.0f, 0.0f, 0.0f);
+inline constexpr Vector4 Vector4::One(1.0f, 1.0f, 1.0f, 1.0f);
+inline constexpr Vector4 Vector4::UnitRect(0.0f, 0.0f, 1.0f, 1.0f);
+inline constexpr Vector4 Vector4::UnitX(1.0f, 0.0f, 0.0f, 0.0f);
+inline constexpr Vector4 Vector4::UnitY(0.0f, 1.0f, 0.0f, 0.0f);
+inline constexpr Vector4 Vector4::UnitZ(0.0f, 0.0f, 1.0f, 1.0f);
+inline constexpr Vector4 Vector4::UnitW(0.0f, 0.0f, 0.0f, 1.0f);
+inline constexpr Vector4 Vector4::NegUnitX(-1.0f, 0.0f, 0.0f, 0.0f);
+inline constexpr Vector4 Vector4::NegUnitY(0.0f, -1.0f, 0.0f, 0.0f);
+inline constexpr Vector4 Vector4::NegUnitZ(0.0f, 0.0f, -1.0f, 0.0f);
+inline constexpr Vector4 Vector4::NegUnitW(0.0f, 0.0f, 0.0f, -1.0f);
+inline constexpr Vector4 Vector4::Infinity(Math::Infinity, Math::Infinity, Math::Infinity, Math::Infinity);
+inline constexpr Vector4 Vector4::NegInfinity(Math::NegInfinity, Math::NegInfinity,
+                                              Math::NegInfinity,Math::NegInfinity);
 
 // 3x3 Matrix
 class Matrix3

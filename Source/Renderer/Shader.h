@@ -18,8 +18,12 @@ public:
 	void SetActive() const;
 
     // Sets a Vector / Matrix uniform
-	void SetVectorUniform (const char* name, const Vector3& vector) const;
-	void SetMatrixUniform(const char* name, const Matrix4& matrix) const;
+    void SetVectorUniform(const char *name, const Vector2 &vector) const;
+    void SetVectorUniform(const char *name, const Vector3 &vector) const;
+    void SetVectorUniform(const char *name, const Vector4 &vector) const;
+    void SetMatrixUniform(const char *name, const Matrix4 &matrix) const;
+    void SetFloatUniform(const char *name, float value) const;
+    void SetIntegerUniform(const char *name, int value) const;
 
 private:
 	// Tries to compile the specified shader

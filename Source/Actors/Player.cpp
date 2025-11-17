@@ -4,7 +4,7 @@
 #include "Enemy.h"
 #include "../Components/CircleColliderComponent.h"
 #include "../Components/RigidBodyComponent.h"
-#include "../Components/DrawComponent.h"
+#include "../Components/AnimatorComponent.h"
 #include "../Components/ParticleSystemComponent.h"
 #include "../Math.h"
 
@@ -38,25 +38,19 @@ Player::Player(class Game* game)
     , mExperienceToNextLevel(100.0f)
     , mLevel(1)
 {
-    // Shape do player
-    float radius = 15.0f;
-    std::vector<Vector2> vertices;
-
-    int numVertices = 16;
-    for (int i = 0; i < numVertices; ++i)
-    {
-        float angle = (Math::TwoPi / numVertices) * i;
-        vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
-    }
-
-    // Triângulo para indicar direção
-    vertices.emplace_back(Vector2(0.0f, radius + 8.0f));
-    vertices.emplace_back(Vector2(-5.0f, radius));
-    vertices.emplace_back(Vector2(5.0f, radius));
-
-    mDrawComponent = new DrawComponent(this, vertices);
-    mDrawComponent->SetColor(Vector3(0.0f, 1.0f, 1.0f)); // ciano
-    mDrawComponent->SetFilled(true);
+    float radius = 16.0f;
+    
+    mAnimatorComponent = new AnimatorComponent(
+        this,
+        "../Assets/Sprites/Player/Idle.png",
+        "../Assets/Sprites/Player/Player.json",
+        32,
+        32
+    );
+    
+    mAnimatorComponent->AddAnimation("Idle", {0}); // Frame 0 from sprite sheet
+    mAnimatorComponent->SetAnimation("Idle");
+    mAnimatorComponent->SetAnimFPS(1.0f); // Static for now, can be changed for future animations
 
     mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
@@ -153,7 +147,6 @@ void Player::TakeDamage(float damage)
     if (mHealth < 0.0f)
         mHealth = 0.0f;
 
-    // ✅ Garantia extra: se zerou a vida, finaliza o jogo imediatamente
     if (mHealth <= 0.0f)
     {
         if (GetGame()->GetState() == MenuState::Playing)
