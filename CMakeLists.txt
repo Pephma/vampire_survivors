@@ -83,6 +83,10 @@ add_executable(${PROJECT_NAME}
         Source/Menus/UpgradeMenu.h
         Source/Audio/AudioSystem.cpp
         Source/Audio/AudioSystem.h
+        Source/Actors/Boss.cpp
+        Source/Actors/Boss.h
+        Source/Actors/DelayedExplosion.cpp
+        Source/Actors/DelayedExplosion.h
         Source/Components/AnimatorComponent.cpp
         Source/Renderer/Texture.cpp
 )

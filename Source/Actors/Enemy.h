@@ -14,6 +14,7 @@ public:
     // --- getters básicos ---
     float GetHealth() const { return mHealth; }
     float GetRadius() const { return mRadius; }
+    float GetMaxHealth() const { return mMaxHealth; }
 
     // --- atributos expostos/setters usados pelo Game ---
     void SetSpeed(float s) { mSpeed = s; }
@@ -39,21 +40,30 @@ public:
     // dano recebido retorna quanto foi de fato aplicado
     float TakeDamage(float damage);
 
-private:
-    // comportamento
+protected:
     void ChasePlayer(float deltaTime);
+
+    // Variáveis que o Boss precisa
+    float mHealth;
+    float mMaxHealth;
+    float mExperienceValue = 10.0f;
+
+    float mSpeed;
+
+    // Componentes que o Boss precisa
+    class RigidBodyComponent* mRigidBodyComponent;
+    class DrawComponent* mDrawComponent;
+    class CircleColliderComponent* mCircleColliderComponent;
+
+private:
     void TryShootAtPlayer(float deltaTime);
     void DoDeathExplosion(); // usado para o Gordo Explosivo
 
-    // stats
-    float mHealth;
-    float mMaxHealth;
-    float mSpeed;
+
     float mRadius;
 
     // novo: combate
     float mDamage = 10.0f;          // dano por contato ou base para inimigos
-    float mExperienceValue = 10.0f; // XP dado ao morrer
 
     // explosão (Gordo Explosivo)
     bool  mExplodesOnDeath = false;
@@ -68,8 +78,4 @@ private:
 
     bool mWasCritKilled;
 
-    // componentes
-    class DrawComponent* mDrawComponent;
-    class RigidBodyComponent* mRigidBodyComponent;
-    class CircleColliderComponent* mCircleColliderComponent;
 };
