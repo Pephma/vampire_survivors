@@ -10,6 +10,7 @@ project(${PROJECT_NAME})
 find_package(SDL2 2.32.2 EXACT REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(SDL2_mixer REQUIRED)
+find_package(SDL2_image REQUIRED)
 
 # Try to find GLEW, but don't fail if not found - we'll handle it manually
 find_package(GLEW QUIET)
@@ -65,6 +66,7 @@ add_executable(${PROJECT_NAME}
         Source/Components/CircleColliderComponent.h
         Source/Renderer/Renderer.cpp
         Source/Renderer/Renderer.h
+        Source/Renderer/Texture.h
         Source/Renderer/VertexArray.h
         Source/Renderer/VertexArray.cpp
         Source/Renderer/TextRenderer.cpp
@@ -85,6 +87,8 @@ add_executable(${PROJECT_NAME}
         Source/Actors/Boss.h
         Source/Actors/DelayedExplosion.cpp
         Source/Actors/DelayedExplosion.h
+        Source/Components/AnimatorComponent.cpp
+        Source/Renderer/Texture.cpp
 )
 
 # Link libraries
@@ -94,6 +98,7 @@ if(GLEW_FOUND)
             SDL2::SDL2main
             SDL2::SDL2
             SDL2_mixer::SDL2_mixer
+	    SDL2_image::SDL2_image
             OpenGL::GL
     )
 else()
@@ -102,6 +107,7 @@ else()
             SDL2::SDL2main
             SDL2::SDL2
             SDL2_mixer::SDL2_mixer
+	    SDL2_image::SDL2_image
             OpenGL::GL
     )
     target_include_directories(${PROJECT_NAME} PRIVATE

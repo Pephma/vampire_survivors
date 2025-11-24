@@ -26,6 +26,9 @@ VertexArray::VertexArray(const float* verts, unsigned int numVerts, const unsign
 	// Specify the vertex attributes (For now, assume one vertex format) Position is 3 floats
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+	
+	// Disable texture coordinate attribute for geometry without textures
+	glDisableVertexAttribArray(1);
 }
 
 VertexArray::~VertexArray()

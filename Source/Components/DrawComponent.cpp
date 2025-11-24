@@ -36,6 +36,19 @@ DrawComponent::DrawComponent(class Actor* owner, std::vector<Vector2> &vertices,
                                  indices.data(), static_cast<unsigned int>(indices.size()));
 }
 
+DrawComponent::DrawComponent(class Actor *owner, int drawOrder)
+        : Component(owner)
+        , mDrawOrder(drawOrder)
+        , mIsVisible(true)
+        , mUseCamera(true)
+        , mUseFilled(false)
+        , mColor(Vector3::One)
+        , mDrawArray(nullptr)
+{
+    mOwner->GetGame()->AddDrawable(this);
+}
+
+
 DrawComponent::~DrawComponent()
 {
     

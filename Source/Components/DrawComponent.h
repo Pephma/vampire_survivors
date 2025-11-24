@@ -12,7 +12,8 @@ class DrawComponent : public Component
 public:
     
     DrawComponent(class Actor* owner, std::vector<Vector2> &vertices, int drawOrder = 100);
-    ~DrawComponent();
+    DrawComponent(class Actor* owner, int drawOrder = 100);
+    ~DrawComponent() override;
 
     virtual void Draw(Renderer* renderer);
     int GetDrawOrder() const { return mDrawOrder; }
