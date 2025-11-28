@@ -1,6 +1,14 @@
 #pragma once
 #include "Actor.h"
 
+enum class PlayerDirection
+{
+    Front,
+    Back,
+    Right,
+    Left
+};
+
 class Player : public Actor
 {
 public:
@@ -56,6 +64,8 @@ public:
     void UpdateAutoAttack(float deltaTime);
 
 private:
+    void UpdateAnimation(const Vector2& moveDirection);
+    
     float mHealth;
     float mMaxHealth;
     float mMoveSpeed;
@@ -93,5 +103,7 @@ private:
     class AnimatorComponent* mAnimatorComponent;
     class RigidBodyComponent* mRigidBodyComponent;
     class CircleColliderComponent* mCircleColliderComponent;
+    
+    PlayerDirection mCurrentDirection;
 };
 

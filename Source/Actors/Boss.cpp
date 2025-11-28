@@ -4,6 +4,7 @@
 #include "DelayedExplosion.h" // Inclui o ator para o bombardeio
 #include "../Components/RigidBodyComponent.h"
 #include "../Components/DrawComponent.h"
+#include "../Components/AnimatorComponent.h"
 #include "../Components/CircleColliderComponent.h"
 #include "../Math.h"
 #include "../Random.h"
@@ -11,8 +12,7 @@
 
 // --- CONSTRUTOR MODIFICADO ---
 Boss::Boss(Game* game, BossKind kind, int waveLevel)
-    // 1. Chama o construtor do Enemy com 1.0 (que cria os componentes ruins)
-    : Enemy(game, 1.0f, 1.0f, 1.0f)
+    : Enemy(game, EnemyKind::Comum, 1.0f, 1.0f, 1.0f)
     , mKind(kind) // Armazena o tipo
     , mStateTimer(0.0f)
     , mAttackSubTimer(0.0f)
@@ -54,13 +54,11 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
 
     // --- CORREÇÃO DO CHEFE INVISÍVEL E TRAVAMENTO (DOUBLE DELETE) ---
 
-    // 2. Deleta o DrawComponent antigo (de raio 1.0) que foi criado pelo Enemy()
-    auto iter = std::find(mComponents.begin(), mComponents.end(), mDrawComponent);
+    auto iter = std::find(mComponents.begin(), mComponents.end(), (Component*)mAnimatorComponent);
     if (iter != mComponents.end())
     {
         mComponents.erase(iter);
     }
-    delete mDrawComponent;
 
     // 3. Recria os vértices com o RAIO CORRETO (baseRadius)
     std::vector<Vector2> vertices;
@@ -71,10 +69,9 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
         vertices.emplace_back(Vector2(Math::Cos(angle) * baseRadius, Math::Sin(angle) * baseRadius));
     }
 
-    // 4. Cria o NOVO DrawComponent
-    mDrawComponent = new DrawComponent(this, vertices);
-    mDrawComponent->SetColor(mBossColor); // Aplica a cor do chefe
-    mDrawComponent->SetFilled(true);
+    mBossDrawComponent = new DrawComponent(this, vertices);
+    mBossDrawComponent->SetColor(mBossColor);
+    mBossDrawComponent->SetFilled(true);
 
     // 5. Atualiza o RAIO DE COLISÃO
     mCircleColliderComponent->SetRadius(baseRadius);
@@ -330,7 +327,10 @@ void Boss::UpdateSpiralAttack(float deltaTime)
 void Boss::UpdateCooldown(float deltaTime)
 {
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
-    mDrawComponent->SetColor(mBossColor); // Garante que a cor volte ao normal
+    if (mBossDrawComponent)
+    {
+        mBossDrawComponent->SetColor(mBossColor);
+    }
 }
 
 void Boss::UpdateTelegraphing(float deltaTime)
@@ -351,13 +351,19 @@ void Boss::UpdateTelegraphing(float deltaTime)
         }
     }
     float blink = Math::Abs(Math::Sin(mStateTimer * 20.0f));
-    mDrawComponent->SetColor(Vector3(1.0f, blink, blink));
+    if (mBossDrawComponent)
+    {
+        mBossDrawComponent->SetColor(Vector3(1.0f, blink, blink));
+    }
 }
 
 void Boss::UpdateDashing(float deltaTime)
 {
     // ... (código original do Dashing) ...
-    mDrawComponent->SetColor(mBossColor);
+    if (mBossDrawComponent)
+    {
+        mBossDrawComponent->SetColor(mBossColor);
+    }
     if (mRigidBodyComponent->GetVelocity().LengthSq() < 1.0f)
     {
         mRigidBodyComponent->SetVelocity(mTargetDirection * 800.0f);
@@ -454,7 +460,10 @@ void Boss::UpdateFireBeam(float deltaTime)
 {
     // 1. Para de se mover e reseta a cor
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
-    mDrawComponent->SetColor(mBossColor);
+    if (mBossDrawComponent)
+    {
+        mBossDrawComponent->SetColor(mBossColor);
+    }
 
     // 2. Atira (só no primeiro frame deste estado)
     if (mTargetDirection.LengthSq() > 1e-4f) // Se a mira foi definida

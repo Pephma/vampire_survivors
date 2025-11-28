@@ -37,20 +37,30 @@ Player::Player(class Game* game)
     , mExperience(0.0f)
     , mExperienceToNextLevel(100.0f)
     , mLevel(1)
+    , mCurrentDirection(PlayerDirection::Front)
 {
     float radius = 16.0f;
     
     mAnimatorComponent = new AnimatorComponent(
         this,
-        "../Assets/Sprites/Player/Idle.png",
+        "../Assets/Sprites/Player/Player.png",
         "../Assets/Sprites/Player/Player.json",
-        32,
-        32
+        28,  // Average width
+        32   // Average height
     );
     
-    mAnimatorComponent->AddAnimation("Idle", {0}); // Frame 0 from sprite sheet
-    mAnimatorComponent->SetAnimation("Idle");
-    mAnimatorComponent->SetAnimFPS(1.0f); // Static for now, can be changed for future animations
+    mAnimatorComponent->AddAnimation("Back", {0, 2, 4});
+    mAnimatorComponent->AddAnimation("Front", {1, 5, 6});
+    mAnimatorComponent->AddAnimation("Right", {7, 8, 3});
+    mAnimatorComponent->AddAnimation("Left", {7, 8, 3});
+    
+    mAnimatorComponent->AddAnimation("IdleFront", {1});
+    mAnimatorComponent->AddAnimation("IdleBack", {0});
+    mAnimatorComponent->AddAnimation("IdleRight", {7});
+    mAnimatorComponent->AddAnimation("IdleLeft", {7});
+    
+    mAnimatorComponent->SetAnimation("IdleFront");
+    mAnimatorComponent->SetAnimFPS(8.0f);  // 8 frames per second for walking animation
 
     mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
@@ -72,12 +82,29 @@ void Player::OnProcessInput(const Uint8* state)
         moveDirection.Normalize();
         mRigidBodyComponent->SetVelocity(moveDirection * mMoveSpeed);
 
-        float angle = Math::Atan2(moveDirection.y, moveDirection.x) + Math::PiOver2;
-        SetRotation(angle);
+        UpdateAnimation(moveDirection);
     }
     else
     {
         mRigidBodyComponent->SetVelocity(Vector2::Zero);
+        
+        switch (mCurrentDirection)
+        {
+            case PlayerDirection::Front:
+                mAnimatorComponent->SetAnimation("IdleFront");
+                break;
+            case PlayerDirection::Back:
+                mAnimatorComponent->SetAnimation("IdleBack");
+                break;
+            case PlayerDirection::Right:
+                mAnimatorComponent->SetAnimation("IdleRight");
+                SetScale(Vector2(1.0f, -1.0f));
+                break;
+            case PlayerDirection::Left:
+                mAnimatorComponent->SetAnimation("IdleLeft");
+                SetScale(Vector2(-1.0f, -1.0f));  // Flip horizontally
+                break;
+        }
     }
 }
 
@@ -133,7 +160,7 @@ void Player::OnUpdate(float deltaTime)
 
     // Limites do mundo
     Vector2 pos = GetPosition();
-    float radius = 15.0f;
+    float radius = 16.0f;
     if (pos.x < radius) pos.x = radius;
     if (pos.x > Game::WORLD_WIDTH - radius) pos.x = Game::WORLD_WIDTH - radius;
     if (pos.y < radius) pos.y = radius;
@@ -177,6 +204,47 @@ void Player::AddExperience(float exp)
     }
 }
 
+void Player::UpdateAnimation(const Vector2& moveDirection)
+{
+    float absX = fabs(moveDirection.x);
+    float absY = fabs(moveDirection.y);
+    
+    PlayerDirection newDirection = mCurrentDirection;
+    
+    if (absY > absX)
+    {
+        if (moveDirection.y < 0.0f)
+        {
+            newDirection = PlayerDirection::Back;
+            mAnimatorComponent->SetAnimation("Back");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+        else
+        {
+            newDirection = PlayerDirection::Front;
+            mAnimatorComponent->SetAnimation("Front");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+    }
+    else
+    {
+        if (moveDirection.x > 0.0f)
+        {
+            newDirection = PlayerDirection::Right;
+            mAnimatorComponent->SetAnimation("Right");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+        else
+        {
+            newDirection = PlayerDirection::Left;
+            mAnimatorComponent->SetAnimation("Left");
+            SetScale(Vector2(-1.0f, -1.0f));
+        }
+    }
+    
+    mCurrentDirection = newDirection;
+}
+
 void Player::UpdateAutoAttack(float deltaTime)
 {
     mAttackCooldown -= deltaTime;
@@ -188,7 +256,7 @@ void Player::UpdateAutoAttack(float deltaTime)
     mAttackCooldown = baseCooldown;
 
     Vector2 playerPos = GetPosition();
-    const float playerRadius = 15.0f + 10.0f;       // distância mínima do corpo
+    const float playerRadius = 16.0f + 10.0f;
     const float baseSpeed   = 800.0f;               // velocidade padrão do projétil
     const float baseDamage  = 20.0f * mDamageMultiplier;
 
@@ -272,10 +340,6 @@ void Player::UpdateAutoAttack(float deltaTime)
             Vector2 reverseOffset = reverseDir * playerRadius;
             GetGame()->SpawnProjectile(playerPos + reverseOffset, reverseDir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage * 0.8f);
         }
-
-        // gira o player para o alvo
-        float angle = Math::Atan2(toEnemy.y, toEnemy.x) + Math::PiOver2;
-        SetRotation(angle);
     }
     else
     {

@@ -580,7 +580,7 @@ void Game::SpawnEnemyOfKind(EnemyKind kind, int count)
         float baseRadius = 12.0f + mCurrentWave * 0.5f;
 
         // Cria inimigo e aplica atributos conforme o tipo
-        Enemy* e = new Enemy(this, baseRadius, baseSpeed, baseHealth);
+        Enemy* e = new Enemy(this, kind, baseRadius, baseSpeed, baseHealth);
 
         switch (kind)
         {

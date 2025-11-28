@@ -62,4 +62,6 @@ private:
     Vector3 mBossColor;
 
     int mAttackCounter; // Para contar múltiplos ataques (ex: Sniper)
+    
+    class DrawComponent* mBossDrawComponent;
 };

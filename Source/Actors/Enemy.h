@@ -2,11 +2,18 @@
 #include "Actor.h"
 #include "../Game.h"
 
+enum class EnemyDirection
+{
+    Front,
+    Back,
+    Right,
+    Left
+};
 
 class Enemy : public Actor
 {
 public:
-    Enemy(class Game* game, float radius, float speed, float health);
+    Enemy(class Game* game, EnemyKind kind, float radius, float speed, float health);
     ~Enemy();
 
     void OnUpdate(float deltaTime) override;
@@ -42,6 +49,7 @@ public:
 
 protected:
     void ChasePlayer(float deltaTime);
+    void UpdateAnimation(const Vector2& directionToPlayer);
 
     // Variáveis que o Boss precisa
     float mHealth;
@@ -52,8 +60,11 @@ protected:
 
     // Componentes que o Boss precisa
     class RigidBodyComponent* mRigidBodyComponent;
-    class DrawComponent* mDrawComponent;
+    class AnimatorComponent* mAnimatorComponent;
     class CircleColliderComponent* mCircleColliderComponent;
+    
+    EnemyKind mKind;
+    EnemyDirection mCurrentDirection;
 
 private:
     void TryShootAtPlayer(float deltaTime);

@@ -5,29 +5,96 @@
 #include "Player.h"
 #include "../Components/CircleColliderComponent.h"
 #include "../Components/RigidBodyComponent.h"
-#include "../Components/DrawComponent.h"
+#include "../Components/AnimatorComponent.h"
 #include "../Math.h"
 
-Enemy::Enemy(class Game* game, float radius, float speed, float health)
+Enemy::Enemy(class Game* game, EnemyKind kind, float radius, float speed, float health)
     : Actor(game)
     , mHealth(health)
     , mMaxHealth(health)
     , mSpeed(speed)
     , mRadius(radius)
+    , mKind(kind)
+    , mCurrentDirection(EnemyDirection::Front)
     , mWasCritKilled(false)
 {
-    // círculo simples
-    std::vector<Vector2> vertices;
-    const int numVertices = 12;
-    for (int i = 0; i < numVertices; ++i)
+    // Configure sprite based on enemy type
+    std::string spritePath;
+    std::string jsonPath;
+    int width, height;
+    
+    switch (kind)
     {
-        float angle = (Math::TwoPi / numVertices) * i;
-        vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
+        case EnemyKind::Comum:
+            spritePath = "../Assets/Sprites/Comum/Comum.png";
+            jsonPath = "../Assets/Sprites/Comum/Comum.json";
+            width = 20;
+            height = 32;
+            break;
+        case EnemyKind::Corredor:
+            spritePath = "../Assets/Sprites/Corredor/Corredor.png";
+            jsonPath = "../Assets/Sprites/Corredor/Corredor.json";
+            width = 24;
+            height = 22;
+            break;
+        case EnemyKind::GordoExplosivo:
+            spritePath = "../Assets/Sprites/Gordo/Gordo.png";
+            jsonPath = "../Assets/Sprites/Gordo/Gordo.json";
+            width = 32;
+            height = 32;
+            break;
+        case EnemyKind::Atirador:
+            spritePath = "../Assets/Sprites/Atirador/Atirador.png";
+            jsonPath = "../Assets/Sprites/Atirador/Atirador.json";
+            width = 24;
+            height = 30;
+            break;
+        default:
+            spritePath = "../Assets/Sprites/Comum/Comum.png";
+            jsonPath = "../Assets/Sprites/Comum/Comum.json";
+            width = 20;
+            height = 32;
+            break;
     }
-
-    mDrawComponent = new DrawComponent(this, vertices);
-    mDrawComponent->SetColor(Vector3(0.9f, 0.1f, 0.1f));
-    mDrawComponent->SetFilled(true);
+    
+    mAnimatorComponent = new AnimatorComponent(this, spritePath, jsonPath, width, height);
+    
+    // Setup animations based on enemy type
+    if (kind == EnemyKind::Comum)
+    {
+        // Comum JSON indices: 0:Back, 1:Front, 2:Left2, 3:Left, 4:Back1, 5:Back2, 6:Front1, 7:Front2, 8:Left1
+        mAnimatorComponent->AddAnimation("Back", {0, 4, 5});
+        mAnimatorComponent->AddAnimation("Front", {1, 6, 7});
+        mAnimatorComponent->AddAnimation("Left", {3, 8, 2});
+        mAnimatorComponent->AddAnimation("Right", {3, 8, 2}); // Will be flipped
+    }
+    else if (kind == EnemyKind::Corredor)
+    {
+        // Corredor JSON indices: 0:Back, 1:Back1, 2:Back2, 3:Front1, 4:Front, 5:Front2, 6:Left1, 7:Left2, 8:Left
+        mAnimatorComponent->AddAnimation("Back", {0, 1, 2});
+        mAnimatorComponent->AddAnimation("Front", {4, 3, 5});
+        mAnimatorComponent->AddAnimation("Left", {8, 6, 7});
+        mAnimatorComponent->AddAnimation("Right", {8, 6, 7}); // Will be flipped
+    }
+    else if (kind == EnemyKind::GordoExplosivo)
+    {
+        // Gordo JSON indices: 0:Back, 1:Front, 2:Back1, 3:Left, 4:Back2, 5:Front1, 6:Front2, 7:Left1, 8:Left2
+        mAnimatorComponent->AddAnimation("Back", {0, 2, 4});
+        mAnimatorComponent->AddAnimation("Front", {1, 5, 6});
+        mAnimatorComponent->AddAnimation("Left", {3, 7, 8});
+        mAnimatorComponent->AddAnimation("Right", {3, 7, 8}); // Will be flipped
+    }
+    else if (kind == EnemyKind::Atirador)
+    {
+        // Atirador JSON indices: 0:Back1, 1:Front, 2:Back, 3:Left, 4:ShooterBack, 5:Back2, 6:ShooterFront, 7:ShooterLeft, 8:Front1, 9:Front2, 10:Left2, 11:Left1
+        mAnimatorComponent->AddAnimation("Back", {2, 0, 5});
+        mAnimatorComponent->AddAnimation("Front", {1, 8, 9});
+        mAnimatorComponent->AddAnimation("Left", {3, 11, 10});
+        mAnimatorComponent->AddAnimation("Right", {3, 11, 10}); // Will be flipped
+    }
+    
+    mAnimatorComponent->SetAnimation("Front");
+    mAnimatorComponent->SetAnimFPS(6.0f);
 
     mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
@@ -43,9 +110,57 @@ Enemy::~Enemy()
     GetGame()->RemoveEnemy(this);
 }
 
+void Enemy::UpdateAnimation(const Vector2& directionToPlayer)
+{
+    // Determine which direction is dominant
+    float absX = fabs(directionToPlayer.x);
+    float absY = fabs(directionToPlayer.y);
+    
+    EnemyDirection newDirection = mCurrentDirection;
+    
+    if (absY > absX)
+    {
+        // Vertical movement is dominant
+        if (directionToPlayer.y < 0.0f)
+        {
+            // Moving up (player is above)
+            newDirection = EnemyDirection::Back;
+            mAnimatorComponent->SetAnimation("Back");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+        else
+        {
+            // Moving down (player is below)
+            newDirection = EnemyDirection::Front;
+            mAnimatorComponent->SetAnimation("Front");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+    }
+    else
+    {
+        // Horizontal movement is dominant
+        if (directionToPlayer.x > 0.0f)
+        {
+            // Moving right (player is to the right)
+            newDirection = EnemyDirection::Right;
+            mAnimatorComponent->SetAnimation("Right");
+            SetScale(Vector2(-1.0f, -1.0f));  // Flip horizontally for right
+        }
+        else
+        {
+            // Moving left (player is to the left)
+            newDirection = EnemyDirection::Left;
+            mAnimatorComponent->SetAnimation("Left");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+    }
+    
+    mCurrentDirection = newDirection;
+}
+
 void Enemy::SetColor(const Vector3& c)
 {
-    if (mDrawComponent) mDrawComponent->SetColor(c);
+
 }
 
 void Enemy::OnUpdate(float deltaTime)
@@ -116,6 +231,7 @@ void Enemy::ChasePlayer(float deltaTime)
     {
         dir.Normalize();
         mRigidBodyComponent->SetVelocity(dir * mSpeed);
+        UpdateAnimation(dir);
     }
 
     // dano por contato (DPS leve ao encostar)

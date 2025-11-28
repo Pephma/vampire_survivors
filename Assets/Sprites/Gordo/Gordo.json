@@ -5,7 +5,7 @@
       "frame": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 32
       },
       "rotated": false,
@@ -13,11 +13,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 32
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 32
       },
       "pivot": {
@@ -30,7 +30,7 @@
       "frame": {
         "x": 0,
         "y": 32,
-        "w": 28,
+        "w": 32,
         "h": 32
       },
       "rotated": false,
@@ -38,11 +38,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 32
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 32
       },
       "pivot": {
@@ -53,9 +53,9 @@
     {
       "filename": "Back1.png",
       "frame": {
-        "x": 28,
+        "x": 32,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "rotated": false,
@@ -63,11 +63,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "pivot": {
@@ -76,11 +76,11 @@
       }
     },
     {
-      "filename": "Right2.png",
+      "filename": "Left.png",
       "frame": {
         "x": 0,
         "y": 64,
-        "w": 24,
+        "w": 32,
         "h": 32
       },
       "rotated": false,
@@ -88,11 +88,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 24,
+        "w": 32,
         "h": 32
       },
       "sourceSize": {
-        "w": 24,
+        "w": 32,
         "h": 32
       },
       "pivot": {
@@ -103,9 +103,9 @@
     {
       "filename": "Back2.png",
       "frame": {
-        "x": 28,
+        "x": 32,
         "y": 30,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "rotated": false,
@@ -113,11 +113,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "pivot": {
@@ -128,9 +128,9 @@
     {
       "filename": "Front1.png",
       "frame": {
-        "x": 56,
+        "x": 64,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "rotated": false,
@@ -138,11 +138,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "pivot": {
@@ -155,7 +155,7 @@
       "frame": {
         "x": 0,
         "y": 96,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "rotated": false,
@@ -163,11 +163,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "pivot": {
@@ -176,11 +176,11 @@
       }
     },
     {
-      "filename": "Right.png",
+      "filename": "Left1.png",
       "frame": {
-        "x": 28,
+        "x": 32,
         "y": 60,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "rotated": false,
@@ -188,11 +188,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "sourceSize": {
-        "w": 28,
+        "w": 32,
         "h": 30
       },
       "pivot": {
@@ -201,11 +201,11 @@
       }
     },
     {
-      "filename": "Right1.png",
+      "filename": "Left2.png",
       "frame": {
-        "x": 56,
+        "x": 64,
         "y": 30,
-        "w": 22,
+        "w": 32,
         "h": 30
       },
       "rotated": false,
@@ -213,11 +213,11 @@
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 22,
+        "w": 32,
         "h": 30
       },
       "sourceSize": {
-        "w": 22,
+        "w": 32,
         "h": 30
       },
       "pivot": {
@@ -229,10 +229,10 @@
   "meta": {
     "app": "http://free-tex-packer.com",
     "version": "0.6.7",
-    "image": "Player.png",
+    "image": "Gordo.png",
     "format": "RGBA8888",
     "size": {
-      "w": 84,
+      "w": 96,
       "h": 126
     },
     "scale": 1

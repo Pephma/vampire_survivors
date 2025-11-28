@@ -81,6 +81,12 @@ void AnimatorComponent::Draw(Renderer *renderer) {
         int spriteIdx = frames[currFrame];
         if (spriteIdx >= 0 && spriteIdx < mSpriteSheetData.size()) {
             rect = mSpriteSheetData[spriteIdx];
+            
+            if (scale.y < 0.0f) {
+                float temp = rect.y;
+                rect.y = rect.y + rect.w;
+                rect.w = -rect.w;
+            }
         }
     }
     renderer->DrawTexture(pos, size, rotation, mColor, mSpriteTexture, rect, camera, flipH, mTextureFactor);
