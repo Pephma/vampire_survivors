@@ -2,6 +2,7 @@
 #include "../Game.h"
 #include "../Renderer/Renderer.h"
 #include "../Renderer/VertexArray.h"
+#include "../Renderer/TextRenderer.h"
 #include "../Components/DrawComponent.h"
 #include <SDL.h>
 
@@ -139,6 +140,10 @@ void Menu::Draw(Renderer* renderer)
         VertexArray btnVA(btnFloatArray.data(), static_cast<unsigned int>(btnVertices.size()), btnIndices.data(), static_cast<unsigned int>(btnIndices.size()));
         Vector3 btnColor = isSelected ? Vector3(0.3f, 0.3f, 0.4f) : Vector3(0.2f, 0.2f, 0.3f);
         renderer->Draw(btnMatrix, &btnVA, btnColor);
+        
+        // Draw text
+        Vector2 textPos(item.position.x + 10.0f, item.position.y + item.size.y / 2.0f - 5.0f);
+        TextRenderer::DrawText(renderer, item.text, textPos, 1.5f, color);
     }
 }
 

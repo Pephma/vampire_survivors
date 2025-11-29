@@ -2,6 +2,7 @@
 #include "../Game.h"
 #include "../Renderer/Renderer.h"
 #include "../Renderer/VertexArray.h"
+#include "../Renderer/TextRenderer.h"
 #include "../Components/DrawComponent.h"
 
 MainMenu::MainMenu(Game* game)
@@ -60,5 +61,10 @@ void MainMenu::Draw(Renderer* renderer)
     VertexArray titleVA(titleFloatArray.data(), static_cast<unsigned int>(titleBg.size()), titleIndices.data(), static_cast<unsigned int>(titleIndices.size()));
     Vector3 titleColor(0.8f, 0.2f, 0.2f);
     renderer->Draw(titleMatrix, &titleVA, titleColor);
+    
+    // Draw title text
+    Vector2 titleTextPos(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f - 120.0f, 130.0f);
+    Vector3 titleTextColor(1.0f, 1.0f, 1.0f);
+    TextRenderer::DrawText(renderer, "VAMPIRE SURVIVORS", titleTextPos, 2.0f, titleTextColor);
 }
 
