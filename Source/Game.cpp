@@ -47,6 +47,7 @@ Game::Game()
         , mScreenShakeAmount(0.0f)
         , mScreenShakeDuration(0.0f)
         , mLastBossWaveSpawned(0) // <-- ADICIONADO PARA O CHEFE
+        , mLastPausePress(0)
 {
 }
 
@@ -137,10 +138,23 @@ void Game::ProcessInput()
     }
     else if (mGameState == MenuState::Playing)
     {
-        // Pause game
+        // Pause game with debounce
         if (state[SDL_SCANCODE_ESCAPE])
         {
-            PauseGame();
+            Uint32 currentTime = SDL_GetTicks();
+            if (currentTime - mLastPausePress > 300) // 300ms delay
+            {
+                PauseGame();
+                mLastPausePress = currentTime;
+            }
+        }
+        else
+        {
+            // Reset timer when ESC is not pressed
+            if (SDL_GetTicks() - mLastPausePress > 500)
+            {
+                mLastPausePress = 0;
+            }
         }
 
         // Process actor input
@@ -364,7 +378,8 @@ void Game::QuitToMenu()
 
 void Game::GameOver()
 {
-    mGameState = MenuState::GameOver;
+    // Volta para o menu inicial quando o player morre
+    QuitToMenu();
 }
 
 void Game::ShowUpgradeMenu()
@@ -957,35 +972,6 @@ void Game::GenerateOutput()
                 }
             }
         }
-    }
-    else if (mGameState == MenuState::GameOver)
-    {
-        for (auto drawable : mDrawables)
-        {
-            drawable->Draw(mRenderer);
-        }
-        DrawUI();
-
-        std::vector<Vector2> gameOverBg;
-        gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f - 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f - 100.0f));
-        gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f + 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f - 100.0f));
-        gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f + 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f + 100.0f));
-        gameOverBg.emplace_back(Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f - 200.0f, static_cast<float>(WINDOW_HEIGHT) / 2.0f + 100.0f));
-
-        std::vector<float> goFloatArray;
-        std::vector<unsigned int> goIndices;
-        for (size_t i = 0; i < gameOverBg.size(); ++i)
-        {
-            goFloatArray.push_back(gameOverBg[i].x);
-            goFloatArray.push_back(gameOverBg[i].y);
-            goFloatArray.push_back(0.0f);
-            goIndices.push_back(static_cast<unsigned int>(i));
-        }
-
-        Matrix4 gameOverMatrix = Matrix4::Identity;
-        VertexArray gameOverVA(goFloatArray.data(), static_cast<unsigned int>(gameOverBg.size()), goIndices.data(), static_cast<unsigned int>(goIndices.size()));
-        Vector3 gameOverColor(0.8f, 0.2f, 0.2f);
-        mRenderer->Draw(gameOverMatrix, &gameOverVA, gameOverColor);
     }
 
     mRenderer->Present();

@@ -143,6 +143,7 @@ private:
     bool mIsRunning;
     bool mIsDebugging;
     bool mUpdatingActors;
+    Uint32 mLastPausePress;
 
     MenuState mGameState;
     class MainMenu* mMainMenu;
