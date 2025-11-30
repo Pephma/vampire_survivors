@@ -94,6 +94,19 @@ public:
     void AddProjectile(class Projectile* projectile);
     void RemoveProjectile(class Projectile* projectile);
     std::vector<class Projectile*>& GetProjectiles() { return mProjectiles; }
+    
+    void SpawnExperienceOrb(const Vector2& position, float experienceValue);
+    void AddExperienceOrb(class ExperienceOrb* orb);
+    void RemoveExperienceOrb(class ExperienceOrb* orb);
+    std::vector<class ExperienceOrb*>& GetExperienceOrbs() { return mExperienceOrbs; }
+    
+    // Deferred experience system - prevents crashes from state changes during updates
+    struct DeferredExperience
+    {
+        float amount;
+        Vector2 position;
+    };
+    void AddDeferredExperience(const DeferredExperience& deferred);
 
     void StartNewGame();
     void ResumeGame();
@@ -113,14 +126,28 @@ public:
                          const Vector2& direction,
                          float speed,
                          bool fromPlayer = true,
-                         float damage = 10.0f);
+                         float damage = 10.0f,
+                         int pierce = 0,
+                         bool homing = false,
+                         bool explosive = false);
 
     void SpawnFallingParticles(const Vector2& position, const Vector3& color);
     void SpawnExplosionRing(const Vector2& position, float radius);
+    void CreateDeathParticles(const Vector2& position, const Vector3& color, int count = 8);
 
     void AddBoss(class Boss* boss);
     void RemoveBoss(class Boss* boss);
+    std::vector<class Boss*>& GetBosses() { return mBosses; }
     void SpawnBoss(int waveNumber);
+    
+    // Creative features
+    void SpawnFloatingText(const Vector2& position, const std::string& text, const Vector3& color);
+    void OnEnemyKilled(const Vector2& position);
+    void AddKill();
+    int GetKills() const { return mKills; }
+    int GetCombo() const { return mCombo; }
+    float GetComboMultiplier() const { return mComboMultiplier; }
+    
 private:
     void ProcessInput();
     void UpdateGame();
@@ -153,6 +180,10 @@ private:
     class Player* mPlayer;
     std::vector<class Enemy*> mEnemies;
     std::vector<class Projectile*> mProjectiles;
+    std::vector<class ExperienceOrb*> mExperienceOrbs;
+    
+    // Deferred experience system - prevents crashes from state changes during updates
+    std::vector<DeferredExperience> mDeferredExperience;
 
     // -------------------------------
     // NOVAS VARIÁVEIS DE WAVE/SPAWN
@@ -174,8 +205,15 @@ private:
     Vector2 mCameraPosition;
     float mScreenShakeAmount;
     float mScreenShakeDuration;
-    void CreateDeathParticles(const Vector2& position, const Vector3& color, int count = 8);
 
     std::vector<class Boss*> mBosses;
     int mLastBossWaveSpawned;
+    
+    // Creative features - combo and kill tracking
+    int mKills;
+    int mCombo;
+    float mComboTimer;
+    float mComboMultiplier;
+    static const float COMBO_TIMEOUT;
+    static const float MAX_COMBO_MULTIPLIER;
 };

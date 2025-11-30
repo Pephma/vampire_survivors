@@ -7,21 +7,26 @@
 #include "../Components/AnimatorComponent.h"
 #include "../Components/ParticleSystemComponent.h"
 #include "../Math.h"
+#include <algorithm>
+
+const float Player::DASH_COOLDOWN_TIME = 2.0f;
+const float Player::DASH_DURATION_TIME = 0.15f;
+const float Player::DASH_SPEED_MULTIPLIER = 3.5f;
 
 Player::Player(class Game* game)
     : Actor(game)
-    , mHealth(100.0f)
-    , mMaxHealth(100.0f)
-    , mMoveSpeed(300.0f)
+    , mHealth(150.0f)  // Increased starting health for better survivability
+    , mMaxHealth(150.0f)
+    , mMoveSpeed(420.0f)  // Faster base movement for better feel
     , mAttackCooldown(0.0f)
     , mDamageMultiplier(1.0f)
     , mAttackSpeedMultiplier(1.0f)
-    , mProjectileCount(8)
+    , mProjectileCount(10)  // Start with more projectiles for better feel
     , mHasHealthRegen(false)
     , mHealthRegenRate(5.0f)
     , mProjectilePierce(0)
     , mCritChance(0.0f)
-    , mCritMultiplier(2.0f)
+    , mCritMultiplier(2.5f)  // Higher crit multiplier for more impact
     , mHasLifesteal(false)
     , mLifestealPercent(0.1f)
     , mExperienceMultiplier(1.0f)
@@ -34,22 +39,30 @@ Player::Player(class Game* game)
     , mReverseShot(false)
     , mHomingProjectiles(false)
     , mExplosiveProjectiles(false)
+    , mHasDash(false)
+    , mDashCooldown(0.0f)
+    , mDashDuration(0.0f)
+    , mDashDirection(Vector2::Zero)
     , mExperience(0.0f)
-    , mExperienceToNextLevel(100.0f)
+    , mExperienceToNextLevel(150.0f)  // More difficult leveling (was 80.0f)
     , mLevel(1)
     , mPendingUpgrades(0)
     , mCurrentDirection(PlayerDirection::Front)
 {
-    float radius = 16.0f;
+    SetPosition(Vector2(Game::WORLD_WIDTH / 2.0f, Game::WORLD_HEIGHT / 2.0f));
+    SetScale(Vector2(1.0f, -1.0f)); // Flip Y to fix upside-down sprite
     
-    mAnimatorComponent = new AnimatorComponent(
-        this,
+    // Create components
+    mRigidBodyComponent = new RigidBodyComponent(this);
+    mCircleColliderComponent = new CircleColliderComponent(this, 16.0f);
+    mAnimatorComponent = new AnimatorComponent(this, 
         "../Assets/Sprites/Player/Player.png",
         "../Assets/Sprites/Player/Player.json",
         28,  // Average width
         32   // Average height
     );
     
+    // Setup animations
     mAnimatorComponent->AddAnimation("Back", {0, 2, 4});
     mAnimatorComponent->AddAnimation("Front", {1, 5, 6});
     mAnimatorComponent->AddAnimation("Right", {7, 8, 3});
@@ -61,50 +74,95 @@ Player::Player(class Game* game)
     mAnimatorComponent->AddAnimation("IdleLeft", {7});
     
     mAnimatorComponent->SetAnimation("IdleFront");
-    mAnimatorComponent->SetAnimFPS(8.0f);  // 8 frames per second for walking animation
-
-    mRigidBodyComponent = new RigidBodyComponent(this, 1.0f);
-    mCircleColliderComponent = new CircleColliderComponent(this, radius);
-
+    mAnimatorComponent->SetAnimFPS(8.0f);
+    
     SetRotation(0.0f);
 }
 
 void Player::OnProcessInput(const Uint8* state)
 {
-    Vector2 moveDirection(0.0f, 0.0f);
-
-    if (state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP])    moveDirection.y -= 1.0f;
-    if (state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN])  moveDirection.y += 1.0f;
-    if (state[SDL_SCANCODE_A] || state[SDL_SCANCODE_LEFT])  moveDirection.x -= 1.0f;
-    if (state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT]) moveDirection.x += 1.0f;
-
-    if (moveDirection.LengthSq() > 0.01f)
+    if (GetGame()->GetState() != MenuState::Playing)
     {
-        moveDirection.Normalize();
-        mRigidBodyComponent->SetVelocity(moveDirection * mMoveSpeed);
-
-        UpdateAnimation(moveDirection);
+        return;
     }
-    else
+    
+    Vector2 moveDir(0.0f, 0.0f);
+    
+    if (state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP])
+    {
+        moveDir.y -= 1.0f;
+    }
+    if (state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN])
+    {
+        moveDir.y += 1.0f;
+    }
+    if (state[SDL_SCANCODE_A] || state[SDL_SCANCODE_LEFT])
+    {
+        moveDir.x -= 1.0f;
+    }
+    if (state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT])
+    {
+        moveDir.x += 1.0f;
+    }
+    
+    // Dash ability (SPACE key)
+    if (mHasDash && mDashCooldown <= 0.0f && mDashDuration <= 0.0f)
+    {
+        if (state[SDL_SCANCODE_SPACE] && moveDir.LengthSq() > 0.0f)
+        {
+            moveDir.Normalize();
+            mDashDirection = moveDir;
+            mDashDuration = DASH_DURATION_TIME;
+            mDashCooldown = DASH_COOLDOWN_TIME;
+            GetGame()->AddScreenShake(2.0f, 0.1f);
+            // Visual effect
+            // No particles for dash
+        }
+    }
+    
+    if (moveDir.LengthSq() > 0.0f)
+    {
+        moveDir.Normalize();
+        float currentSpeed = mMoveSpeed;
+        
+        // Apply dash speed multiplier
+        if (mDashDuration > 0.0f)
+        {
+            currentSpeed *= DASH_SPEED_MULTIPLIER;
+            mRigidBodyComponent->SetVelocity(mDashDirection * currentSpeed);
+        }
+        else
+        {
+            mRigidBodyComponent->SetVelocity(moveDir * currentSpeed);
+        }
+        UpdateAnimation(moveDir);
+    }
+    else if (mDashDuration <= 0.0f)
     {
         mRigidBodyComponent->SetVelocity(Vector2::Zero);
-        
-        switch (mCurrentDirection)
+        // Set idle animation when not moving
+        if (mAnimatorComponent)
         {
-            case PlayerDirection::Front:
-                mAnimatorComponent->SetAnimation("IdleFront");
-                break;
-            case PlayerDirection::Back:
-                mAnimatorComponent->SetAnimation("IdleBack");
-                break;
-            case PlayerDirection::Right:
-                mAnimatorComponent->SetAnimation("IdleRight");
-                SetScale(Vector2(1.0f, -1.0f));
-                break;
-            case PlayerDirection::Left:
-                mAnimatorComponent->SetAnimation("IdleLeft");
-                SetScale(Vector2(-1.0f, -1.0f));  // Flip horizontally
-                break;
+            switch (mCurrentDirection)
+            {
+                case PlayerDirection::Back:
+                    mAnimatorComponent->SetAnimation("IdleBack");
+                    SetScale(Vector2(1.0f, -1.0f)); // Keep Y flipped
+                    break;
+                case PlayerDirection::Right:
+                    mAnimatorComponent->SetAnimation("IdleRight");
+                    SetScale(Vector2(1.0f, -1.0f)); // Keep Y flipped
+                    break;
+                case PlayerDirection::Left:
+                    mAnimatorComponent->SetAnimation("IdleLeft");
+                    SetScale(Vector2(-1.0f, -1.0f)); // Flip both X and Y
+                    break;
+                case PlayerDirection::Front:
+                default:
+                    mAnimatorComponent->SetAnimation("IdleFront");
+                    SetScale(Vector2(1.0f, -1.0f)); // Keep Y flipped
+                    break;
+            }
         }
     }
 }
@@ -116,10 +174,22 @@ void Player::OnUpdate(float deltaTime)
     {
         return;
     }
-
+    
+    // Don't update if player is dead - stop all actions
+    if (mHealth <= 0.0f)
+    {
+        // Stop movement and attacks
+        if (mRigidBodyComponent)
+        {
+            mRigidBodyComponent->SetVelocity(Vector2::Zero);
+        }
+        return;  // Don't attack, don't move, don't do anything
+    }
+    
+    // Update auto attack (shooting)
     UpdateAutoAttack(deltaTime);
-
-    // Orbitais (estético/jogabilidade)
+    
+    // Orbital weapons (if enabled)
     if (mOrbitalWeapons)
     {
         mOrbitalAngle += deltaTime * 3.0f;
@@ -135,34 +205,74 @@ void Player::OnUpdate(float deltaTime)
             {
                 float angle = mOrbitalAngle + (Math::TwoPi / mOrbitalCount) * i;
                 Vector2 orbitalPos = playerPos + Vector2(Math::Cos(angle) * orbitRadius, Math::Sin(angle) * orbitRadius);
-                Vector2 tangentDir(-Math::Sin(angle), Math::Cos(angle)); // tangente
-                // offset já está aplicado por nascer no perímetro do círculo orbital
-                GetGame()->SpawnProjectile(orbitalPos, tangentDir, 400.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 16.0f * mDamageMultiplier);
+                Vector2 tangentDir(-Math::Sin(angle), Math::Cos(angle)); // tangent
+                GetGame()->SpawnProjectile(orbitalPos, tangentDir, 400.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 16.0f * mDamageMultiplier,
+                    mProjectilePierce, mHomingProjectiles, mExplosiveProjectiles);
             }
             orbitalTimer = 0.0f;
         }
     }
-
-    // Regen
-    if (mHasHealthRegen && mHealth < mMaxHealth)
+    
+    // Dash cooldown and duration
+    if (mDashCooldown > 0.0f)
     {
-        Heal(mHealthRegenRate * deltaTime);
+        mDashCooldown -= deltaTime;
+        if (mDashCooldown < 0.0f) mDashCooldown = 0.0f;
     }
-
-    // Dano por contato com inimigos
-    for (auto enemy : GetGame()->GetEnemies())
+    if (mDashDuration > 0.0f)
     {
-        if (mCircleColliderComponent->Intersect(*enemy->GetComponent<CircleColliderComponent>()))
+        mDashDuration -= deltaTime;
+        if (mDashDuration <= 0.0f)
         {
-            TakeDamage(10.0f * deltaTime);
-            GetGame()->AddScreenShake(5.0f, 0.15f);
-            break;
+            mDashDuration = 0.0f;
+            // Dash trail effect
+            // No particles for dash end
+        }
+        else
+        {
+            // Update animation during dash to maintain correct direction
+            UpdateAnimation(mDashDirection);
         }
     }
-
+    else
+    {
+        // Update animation based on current velocity when not dashing
+        if (mRigidBodyComponent)
+        {
+            Vector2 velocity = mRigidBodyComponent->GetVelocity();
+            if (velocity.LengthSq() > 0.0f)
+            {
+                velocity.Normalize();
+                UpdateAnimation(velocity);
+            }
+        }
+    }
+    
+    // Health regen
+    if (mHasHealthRegen && mHealth < mMaxHealth)
+    {
+        mHealth += mHealthRegenRate * deltaTime;
+        if (mHealth > mMaxHealth) mHealth = mMaxHealth;
+    }
+    
+    // Dano por contato com inimigos - reduced damage for better balance
+    for (auto enemy : GetGame()->GetEnemies())
+    {
+        if (enemy && enemy->GetState() == ActorState::Active && mCircleColliderComponent)
+        {
+            auto* enemyCollider = enemy->GetComponent<CircleColliderComponent>();
+            if (enemyCollider && mCircleColliderComponent->Intersect(*enemyCollider))
+            {
+                TakeDamage(6.0f * deltaTime);  // Reduced for better survivability
+                GetGame()->AddScreenShake(5.0f, 0.15f);  // Better feedback
+                break;
+            }
+        }
+    }
+    
+    // Death check
     if (mHealth <= 0.0f)
     {
-        // Só chama GameOver se ainda estiver em estado Playing
         if (GetGame()->GetState() == MenuState::Playing)
         {
             GetGame()->GameOver();
@@ -182,15 +292,11 @@ void Player::OnUpdate(float deltaTime)
 void Player::TakeDamage(float damage)
 {
     mHealth -= damage;
-    if (mHealth < 0.0f)
-        mHealth = 0.0f;
-
+    if (mHealth < 0.0f) mHealth = 0.0f;
+    
     if (mHealth <= 0.0f)
     {
-        if (GetGame()->GetState() == MenuState::Playing)
-        {
-            GetGame()->GameOver();
-        }
+        GetGame()->AddScreenShake(8.0f, 0.3f);
     }
 }
 
@@ -204,51 +310,79 @@ void Player::Heal(float amount)
 void Player::AddExperience(float exp)
 {
     mExperience += exp * mExperienceMultiplier;
+    
+    // Check for level ups - but don't show menu multiple times
+    bool shouldShowMenu = false;
     while (mExperience >= mExperienceToNextLevel)
     {
         mExperience -= mExperienceToNextLevel;
         mLevel++;
-        mExperienceToNextLevel *= 1.5f;
         mPendingUpgrades++;
+        // Better XP scaling - much more difficult progression at each level
+        mExperienceToNextLevel = 150.0f + (mLevel * mLevel * 15.0f);  // Exponential scaling - much harder at higher levels
         GetGame()->AddScreenShake(8.0f, 0.3f);
+        
+        // Mark that we should show menu, but only once
+        if (!shouldShowMenu && GetGame()->GetState() == MenuState::Playing)
+        {
+            shouldShowMenu = true;
+        }
+    }
+    
+    // Show upgrade menu once after processing all level ups
+    if (shouldShowMenu && GetGame()->GetState() == MenuState::Playing)
+    {
+        GetGame()->ShowUpgradeMenu();
     }
 }
 
 void Player::UpdateAnimation(const Vector2& moveDirection)
 {
-    float absX = fabs(moveDirection.x);
-    float absY = fabs(moveDirection.y);
+    if (!mAnimatorComponent) return;
     
     PlayerDirection newDirection = mCurrentDirection;
     
-    if (absY > absX)
+    if (moveDirection.LengthSq() > 0.0f)
     {
-        if (moveDirection.y < 0.0f)
+        // Determine which direction is dominant (similar to enemy logic)
+        float absX = Math::Abs(moveDirection.x);
+        float absY = Math::Abs(moveDirection.y);
+        
+        if (absY > absX)
         {
-            newDirection = PlayerDirection::Back;
-            mAnimatorComponent->SetAnimation("Back");
-            SetScale(Vector2(1.0f, -1.0f));
+            // Vertical movement is dominant
+            if (moveDirection.y < 0.0f)
+            {
+                // Moving up
+                newDirection = PlayerDirection::Back;
+                mAnimatorComponent->SetAnimation("Back");
+                SetScale(Vector2(1.0f, -1.0f)); // Keep Y flipped
+            }
+            else
+            {
+                // Moving down
+                newDirection = PlayerDirection::Front;
+                mAnimatorComponent->SetAnimation("Front");
+                SetScale(Vector2(1.0f, -1.0f)); // Keep Y flipped
+            }
         }
         else
         {
-            newDirection = PlayerDirection::Front;
-            mAnimatorComponent->SetAnimation("Front");
-            SetScale(Vector2(1.0f, -1.0f));
-        }
-    }
-    else
-    {
-        if (moveDirection.x > 0.0f)
-        {
-            newDirection = PlayerDirection::Right;
-            mAnimatorComponent->SetAnimation("Right");
-            SetScale(Vector2(1.0f, -1.0f));
-        }
-        else
-        {
-            newDirection = PlayerDirection::Left;
-            mAnimatorComponent->SetAnimation("Left");
-            SetScale(Vector2(-1.0f, -1.0f));
+            // Horizontal movement is dominant
+            if (moveDirection.x > 0.0f)
+            {
+                // Moving right
+                newDirection = PlayerDirection::Right;
+                mAnimatorComponent->SetAnimation("Right");
+                SetScale(Vector2(1.0f, -1.0f)); // Keep Y flipped, normal X
+            }
+            else
+            {
+                // Moving left
+                newDirection = PlayerDirection::Left;
+                mAnimatorComponent->SetAnimation("Right"); // Use right animation flipped
+                SetScale(Vector2(-1.0f, -1.0f)); // Flip both X and Y for left
+            }
         }
     }
     
@@ -258,111 +392,125 @@ void Player::UpdateAnimation(const Vector2& moveDirection)
 void Player::UpdateAutoAttack(float deltaTime)
 {
     mAttackCooldown -= deltaTime;
-
-    if (mAttackCooldown > 0.0f) return;
-
-    // Recarrega cooldown
+    
     float baseCooldown = 0.5f / mAttackSpeedMultiplier;
-    mAttackCooldown = baseCooldown;
-
-    Vector2 playerPos = GetPosition();
-    const float playerRadius = 16.0f + 10.0f;
-    const float baseSpeed   = 800.0f;               // velocidade padrão do projétil
-    const float baseDamage  = 20.0f * mDamageMultiplier;
-
-    // 1) Shotgun
-    if (mShotgunMode)
+    
+    if (mAttackCooldown <= 0.0f)
     {
+        mAttackCooldown = baseCooldown;
+        
+        Vector2 playerPos = GetPosition();
+        float baseSpeed = 750.0f;  // Even faster projectiles for spectacular feel
+        float baseDamage = 25.0f * mDamageMultiplier;  // Better base damage for more satisfying kills
+        
+        // Apply crit chance
+        bool isCrit = Random::GetFloatRange(0.0f, 1.0f) < mCritChance;
+        if (isCrit)
+        {
+            baseDamage *= mCritMultiplier;
+        }
+        
         int numProjectiles = mProjectileCount;
-        float totalSpread = Math::Pi; // 180°
-        for (int i = 0; i < numProjectiles; ++i)
+        
+        // Scale projectile count with level for spectacular progression
+        int levelBonus = mLevel / 2;  // +1 projectile every 2 levels (faster scaling for epic feel)
+        numProjectiles += levelBonus;
+        
+        // Scale damage with level for better progression
+        float levelDamageBonus = 1.0f + (mLevel * 0.04f);  // +4% damage per level for better scaling
+        baseDamage *= levelDamageBonus;
+        
+        if (mShotgunMode)
         {
-            float angle = (totalSpread / (numProjectiles - 1)) * i - totalSpread / 2.0f;
-            Vector2 dir(Math::Cos(angle), Math::Sin(angle));
-            dir.Normalize();
-            Vector2 offset = dir * playerRadius;
-            GetGame()->SpawnProjectile(playerPos + offset, dir, 1200.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 12.0f * mDamageMultiplier);
+            // Shotgun: fire at nearest enemy in a cone (no distance limit)
+            Vector2 targetDirection(1.0f, 0.0f); // Default direction (right)
+            
+            // Find nearest enemy - no distance limit
+            Enemy* nearestEnemy = nullptr;
+            float nearestDistance = Math::Infinity; // Use infinity to find any enemy
+            
+            for (auto* enemy : GetGame()->GetEnemies())
+            {
+                if (!enemy || enemy->GetState() != ActorState::Active) continue;
+                
+                Vector2 toEnemy = enemy->GetPosition() - playerPos;
+                float dist = toEnemy.LengthSq();
+                if (dist < nearestDistance)
+                {
+                    nearestDistance = dist;
+                    nearestEnemy = enemy;
+                }
+            }
+            
+            // If we found an enemy, aim at it (no distance check)
+            if (nearestEnemy)
+            {
+                targetDirection = nearestEnemy->GetPosition() - playerPos;
+                if (targetDirection.LengthSq() > 0.0001f) // Avoid division by zero
+                {
+                    targetDirection.Normalize();
+                }
+                else
+                {
+                    targetDirection = Vector2(1.0f, 0.0f); // Default if enemy is on top of player
+                }
+            }
+            
+            // Calculate base angle from target direction
+            float baseAngle = Math::Atan2(targetDirection.y, targetDirection.x);
+            
+            // Shotgun: fire in a cone centered on nearest enemy
+            float coneAngle = Math::Pi / 4.0f;  // 45 degrees spread
+            for (int i = 0; i < numProjectiles; ++i)
+            {
+                float angle = baseAngle - coneAngle / 2.0f + (coneAngle / (numProjectiles - 1)) * i;
+                Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+                GetGame()->SpawnProjectile(playerPos, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage,
+                    mProjectilePierce, mHomingProjectiles, mExplosiveProjectiles);
+            }
         }
-        return;
-    }
-
-    // 2) Espiral
-    if (mSpiralMode)
-    {
-        static float spiralAngle = 0.0f;
-        spiralAngle += 0.5f;
-        int numProjectiles = mProjectileCount;
-        for (int i = 0; i < numProjectiles; ++i)
+        else if (mSpiralMode)
         {
-            float angle = spiralAngle + (Math::TwoPi / numProjectiles) * i;
-            Vector2 dir(Math::Cos(angle), Math::Sin(angle));
-            dir.Normalize();
-            Vector2 offset = dir * playerRadius;
-            GetGame()->SpawnProjectile(playerPos + offset, dir, 800.0f * mDamageMultiplier, /*fromPlayer*/ true, /*damage*/ 16.0f * mDamageMultiplier);
+            // Spiral: projectiles spiral outward
+            static float spiralAngle = 0.0f;
+            spiralAngle += Math::TwoPi / numProjectiles;
+            for (int i = 0; i < numProjectiles; ++i)
+            {
+                float angle = spiralAngle + (Math::TwoPi / numProjectiles) * i;
+                Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+                GetGame()->SpawnProjectile(playerPos, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage,
+                    mProjectilePierce, mHomingProjectiles, mExplosiveProjectiles);
+            }
         }
-        return;
-    }
-
-    // 3) Padrão: mira no inimigo mais próximo; se não houver, atira em todas direções
-    Enemy* nearestEnemy = nullptr;
-    float nearestDistance = 10000.0f;
-
-    for (auto enemy : GetGame()->GetEnemies())
-    {
-        float dist = (enemy->GetPosition() - playerPos).Length();
-        if (dist < nearestDistance)
+        else if (mOrbitalWeapons)
         {
-            nearestDistance = dist;
-            nearestEnemy = enemy;
+            // Orbital: projectiles orbit around player
+            mOrbitalAngle += deltaTime * 3.0f;
+            for (int i = 0; i < mOrbitalCount; ++i)
+            {
+                float angle = mOrbitalAngle + (Math::TwoPi / mOrbitalCount) * i;
+                float radius = 50.0f;
+                Vector2 offset(Math::Cos(angle) * radius, Math::Sin(angle) * radius);
+                Vector2 projPos = playerPos + offset;
+                Vector2 dir(Math::Cos(angle + Math::Pi / 2.0f), Math::Sin(angle + Math::Pi / 2.0f));
+                GetGame()->SpawnProjectile(projPos, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage,
+                    mProjectilePierce, mHomingProjectiles, mExplosiveProjectiles);
+            }
         }
-    }
-
-    if (nearestEnemy)
-    {
-        Vector2 toEnemy = nearestEnemy->GetPosition() - playerPos;
-        if (toEnemy.LengthSq() < 1e-6f) toEnemy = Vector2(1.0f, 0.0f);
-        toEnemy.Normalize();
-
-        Vector2 spawnOffset = toEnemy * playerRadius;
-
-        int numProjectiles = mProjectileCount;
-        float spreadAngle = 0.3f; // ~17°
-
-        // Conjunto “leque” em torno do alvo
-        for (int i = 0; i < numProjectiles; ++i)
+        else
         {
-            float angleOffset = ((i - numProjectiles / 2.0f) / std::max(1, numProjectiles - 1)) * spreadAngle;
-            float baseAngle = Math::Atan2(toEnemy.y, toEnemy.x);
-            float current = baseAngle + angleOffset;
-
-            Vector2 dir(Math::Cos(current), Math::Sin(current));
-            dir.Normalize();
-
-            Vector2 offset = dir * playerRadius;
-            GetGame()->SpawnProjectile(playerPos + offset, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage);
-        }
-
-        // Reverse Shot opcional
-        if (mReverseShot)
-        {
-            Vector2 reverseDir = toEnemy * -1.0f;
-            reverseDir.Normalize();
-            Vector2 reverseOffset = reverseDir * playerRadius;
-            GetGame()->SpawnProjectile(playerPos + reverseOffset, reverseDir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage * 0.8f);
-        }
-    }
-    else
-    {
-        // Sem inimigos: círculo completo
-        int numProjectiles = mProjectileCount;
-        for (int i = 0; i < numProjectiles; ++i)
-        {
-            float angle = (Math::TwoPi / numProjectiles) * i;
-            Vector2 dir(Math::Cos(angle), Math::Sin(angle));
-            dir.Normalize();
-
-            Vector2 offset = dir * playerRadius;
-            GetGame()->SpawnProjectile(playerPos + offset, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage);
+            // Normal: fire in all directions
+            float playerRadius = 20.0f;
+            for (int i = 0; i < numProjectiles; ++i)
+            {
+                float angle = (Math::TwoPi / numProjectiles) * i;
+                Vector2 dir(Math::Cos(angle), Math::Sin(angle));
+                dir.Normalize();
+                
+                Vector2 offset = dir * playerRadius;
+                GetGame()->SpawnProjectile(playerPos + offset, dir, baseSpeed, /*fromPlayer*/ true, /*damage*/ baseDamage,
+                    mProjectilePierce, mHomingProjectiles, mExplosiveProjectiles);
+            }
         }
     }
 }

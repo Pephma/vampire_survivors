@@ -1,4 +1,5 @@
 #include "Texture.h"
+#include <SDL.h>
 
 Texture::Texture()
     : mTextureID(0)
@@ -29,6 +30,38 @@ bool Texture::Load(const std::string &filePath) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     SDL_FreeSurface(surf);
 
+    return true;
+}
+
+bool Texture::LoadFromSurface(SDL_Surface* surface) {
+    if (!surface) {
+        return false;
+    }
+    
+    mWidth = surface->w;
+    mHeight = surface->h;
+    
+    // Convert to RGBA if needed
+    SDL_Surface* formattedSurface = nullptr;
+    if (surface->format->format != SDL_PIXELFORMAT_RGBA32) {
+        formattedSurface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+        if (!formattedSurface) {
+            return false;
+        }
+        surface = formattedSurface;
+    }
+    
+    glGenTextures(1, &mTextureID);
+    glBindTexture(GL_TEXTURE_2D, mTextureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mWidth, mHeight, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, surface->pixels);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    if (formattedSurface) {
+        SDL_FreeSurface(formattedSurface);
+    }
+    
     return true;
 }
 

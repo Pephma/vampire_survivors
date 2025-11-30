@@ -11,6 +11,7 @@ public:
     ~Texture();
 
     bool Load(const std::string &fileName);
+    bool LoadFromSurface(SDL_Surface* surface);
 
     void Unload();
 
