@@ -25,8 +25,14 @@ Actor::Actor(Game* game)
 
 Actor::~Actor()
 {
-    mGame->RemoveActor(this);
+    // Safely remove from game's actor list
+    // Check if game pointer is valid before calling (defensive programming)
+    if (mGame)
+    {
+        mGame->RemoveActor(this);
+    }
 
+    // Delete all components
     for (auto component : mComponents)
     {
         delete component;

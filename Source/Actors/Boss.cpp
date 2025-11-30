@@ -142,9 +142,14 @@ void Boss::OnUpdate(float deltaTime)
     // 1. Lógica de Morte (essencial)
     if (mHealth <= 0.0f)
     {
-        if (auto* player = GetGame()->GetPlayer())
+        // Spawn experience orbs from boss
+        int numOrbs = 5 + Random::GetIntRange(0, 5);  // 5-10 orbs
+        for (int i = 0; i < numOrbs; ++i)
         {
-            player->AddExperience(mExperienceValue);
+            float angle = (Math::TwoPi / numOrbs) * i + Random::GetFloatRange(-0.5f, 0.5f);
+            float distance = 30.0f + Random::GetFloatRange(-10.0f, 10.0f);
+            Vector2 orbPos = GetPosition() + Vector2(Math::Cos(angle) * distance, Math::Sin(angle) * distance);
+            GetGame()->SpawnExperienceOrb(orbPos, mExperienceValue / numOrbs);
         }
 
         // Efeito de morte grande
@@ -157,7 +162,9 @@ void Boss::OnUpdate(float deltaTime)
     }
 
     // 2. Lógica de Colisão com Projéteis
-    // ...
+    // Boss inherits from Enemy, so projectile collision is handled in Projectile::OnUpdate
+    // which checks GetEnemies(). Since Boss is added to enemies list via Enemy constructor,
+    // collisions should work automatically. No additional handling needed here.
 
 
     // 3. A Máquina de Estados (O Padrão de Ataque)

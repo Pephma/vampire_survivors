@@ -45,6 +45,7 @@ public:
     void EnableHomingProjectiles() { mHomingProjectiles = true; }
     void EnableExplosiveProjectiles() { mExplosiveProjectiles = true; }
     void IncreaseOrbitalCount(int count) { mOrbitalCount += count; }
+    void EnableDash() { mHasDash = true; }
     float GetDamageMultiplier() const { return mDamageMultiplier; }
     float GetAttackSpeedMultiplier() const { return mAttackSpeedMultiplier; }
     int GetProjectilePierce() const { return mProjectilePierce; }
@@ -96,6 +97,15 @@ private:
     bool mReverseShot;
     bool mHomingProjectiles;
     bool mExplosiveProjectiles;
+    
+    // Dash ability
+    bool mHasDash;
+    float mDashCooldown;
+    float mDashDuration;
+    Vector2 mDashDirection;
+    static const float DASH_COOLDOWN_TIME;
+    static const float DASH_DURATION_TIME;
+    static const float DASH_SPEED_MULTIPLIER;
     
     // Experience
     float mExperience;

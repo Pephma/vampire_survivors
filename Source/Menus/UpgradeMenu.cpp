@@ -79,7 +79,27 @@ void UpgradeMenu::ProcessInput(const Uint8* keyState)
 
 void UpgradeMenu::Draw(Renderer* renderer)
 {
-    Menu::Draw(renderer);
+    // Draw semi-transparent background overlay
+    std::vector<Vector2> bgVertices;
+    bgVertices.emplace_back(Vector2(0.0f, 0.0f));
+    bgVertices.emplace_back(Vector2(static_cast<float>(Game::WINDOW_WIDTH), 0.0f));
+    bgVertices.emplace_back(Vector2(static_cast<float>(Game::WINDOW_WIDTH), static_cast<float>(Game::WINDOW_HEIGHT)));
+    bgVertices.emplace_back(Vector2(0.0f, static_cast<float>(Game::WINDOW_HEIGHT)));
+    
+    std::vector<float> bgFloatArray;
+    std::vector<unsigned int> bgIndices;
+    for (size_t i = 0; i < bgVertices.size(); ++i)
+    {
+        bgFloatArray.push_back(bgVertices[i].x);
+        bgFloatArray.push_back(bgVertices[i].y);
+        bgFloatArray.push_back(0.0f);
+        bgIndices.push_back(static_cast<unsigned int>(i));
+    }
+    
+    Matrix4 bgMatrix = Matrix4::Identity;
+    VertexArray bgVA(bgFloatArray.data(), static_cast<unsigned int>(bgVertices.size()), bgIndices.data(), static_cast<unsigned int>(bgIndices.size()));
+    Vector3 bgColor(0.05f, 0.05f, 0.1f);  // Dark blue background
+    renderer->Draw(bgMatrix, &bgVA, bgColor);
     
     // Draw title background
     std::vector<Vector2> titleBg;
@@ -234,18 +254,18 @@ void UpgradeMenu::GenerateUpgrades()
     
     // Damage upgrade
     Upgrade damageUpgrade;
-    damageUpgrade.name = "DAMAGE +10%";
-    damageUpgrade.description = "Increase weapon damage by 10%";
+    damageUpgrade.name = "DAMAGE +15%";
+    damageUpgrade.description = "Increase weapon damage by 15%";
     damageUpgrade.rarity = UpgradeRarity::Common;
-    damageUpgrade.onSelect = [player]() { player->IncreaseDamageMultiplier(0.1f); };
+    damageUpgrade.onSelect = [player]() { player->IncreaseDamageMultiplier(0.15f); };
     commonUpgrades.push_back(damageUpgrade);
     
     // Attack speed upgrade
     Upgrade speedUpgrade;
-    speedUpgrade.name = "ATTACK SPEED +15%";
-    speedUpgrade.description = "Increase attack speed by 15%";
+    speedUpgrade.name = "ATTACK SPEED +20%";
+    speedUpgrade.description = "Increase attack speed by 20%";
     speedUpgrade.rarity = UpgradeRarity::Common;
-    speedUpgrade.onSelect = [player]() { player->IncreaseAttackSpeed(0.15f); };
+    speedUpgrade.onSelect = [player]() { player->IncreaseAttackSpeed(0.20f); };
     commonUpgrades.push_back(speedUpgrade);
     
     // Movement speed upgrade
@@ -354,6 +374,14 @@ void UpgradeMenu::GenerateUpgrades()
     reverseShotUpgrade.onSelect = [player]() { player->EnableReverseShot(); };
     rareUpgrades.push_back(reverseShotUpgrade);
     
+    // Dash Ability
+    Upgrade dashUpgrade;
+    dashUpgrade.name = "DASH";
+    dashUpgrade.description = "Press SPACE to dash (2s cooldown)";
+    dashUpgrade.rarity = UpgradeRarity::Rare;
+    dashUpgrade.onSelect = [player]() { player->EnableDash(); };
+    rareUpgrades.push_back(dashUpgrade);
+    
     // ===== LEGENDARY UPGRADES =====
     
     // Death Ray
@@ -412,13 +440,7 @@ void UpgradeMenu::GenerateUpgrades()
     homingUpgrade.onSelect = [player]() { player->EnableHomingProjectiles(); player->IncreaseDamageMultiplier(0.5f); };
     legendaryUpgrades.push_back(homingUpgrade);
     
-    // Explosive Rounds
-    Upgrade explosiveUpgrade;
-    explosiveUpgrade.name = "EXPLOSIVE ROUNDS";
-    explosiveUpgrade.description = "Projectiles explode on hit";
-    explosiveUpgrade.rarity = UpgradeRarity::Legendary;
-    explosiveUpgrade.onSelect = [player]() { player->EnableExplosiveProjectiles(); player->IncreaseDamageMultiplier(1.0f); };
-    legendaryUpgrades.push_back(explosiveUpgrade);
+    // Explosive Rounds - REMOVED
     
     // Double Orbital Ring
     Upgrade doubleOrbitalUpgrade;
@@ -436,23 +458,23 @@ void UpgradeMenu::GenerateUpgrades()
     chaosUpgrade.onSelect = [player]() { player->EnableShotgunMode(); player->EnableSpiralMode(); player->EnableReverseShot(); player->IncreaseProjectileCount(5); };
     legendaryUpgrades.push_back(chaosUpgrade);
     
-    // Select upgrades with weighted rarity
-    // 60% common, 30% rare, 10% legendary
+    // Select upgrades with weighted rarity - better chances for rare/legendary
+    // 50% common, 35% rare, 15% legendary (improved chances)
     while (mAvailableUpgrades.size() < 3)
     {
         float roll = Random::GetFloat();
         Upgrade selected;
         
-        if (roll < 0.1f && !legendaryUpgrades.empty())
+        if (roll < 0.15f && !legendaryUpgrades.empty())
         {
-            // 10% legendary
+            // 15% legendary (increased from 10%)
             int index = Random::GetIntRange(0, static_cast<int>(legendaryUpgrades.size()) - 1);
             selected = legendaryUpgrades[index];
             legendaryUpgrades.erase(legendaryUpgrades.begin() + index);
         }
-        else if (roll < 0.4f && !rareUpgrades.empty())
+        else if (roll < 0.5f && !rareUpgrades.empty())
         {
-            // 30% rare
+            // 35% rare (increased from 30%)
             int index = Random::GetIntRange(0, static_cast<int>(rareUpgrades.size()) - 1);
             selected = rareUpgrades[index];
             rareUpgrades.erase(rareUpgrades.begin() + index);
