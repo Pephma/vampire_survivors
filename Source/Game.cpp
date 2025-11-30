@@ -187,10 +187,22 @@ void Game::UpdateGame()
 
 void Game::UpdateActors(float deltaTime)
 {
+    // Don't update actors if we're not in Playing state
+    if (mGameState != MenuState::Playing)
+    {
+        return;
+    }
+    
     mUpdatingActors = true;
 
     for (auto actor : mActors)
     {
+        // Check state again in case it changed during update
+        if (mGameState != MenuState::Playing)
+        {
+            break;
+        }
+        
         actor->Update(deltaTime);
 
         // (Opcional) limpeza de partículas longe da câmera
@@ -367,8 +379,13 @@ void Game::PauseGame()
 
 void Game::QuitToMenu()
 {
-    CleanupGame();
     mGameState = MenuState::MainMenu;
+
+    if (!mUpdatingActors)
+    {
+        CleanupGame();
+    }
+
     if (mAudioSystem)
     {
         mAudioSystem->StopMusic();
@@ -378,6 +395,12 @@ void Game::QuitToMenu()
 
 void Game::GameOver()
 {
+    // Só processa se ainda estiver em estado Playing
+    if (mGameState != MenuState::Playing)
+    {
+        return;
+    }
+    
     // Volta para o menu inicial quando o player morre
     QuitToMenu();
 }
@@ -865,6 +888,10 @@ void Game::DrawUI()
 
 void Game::CleanupGame()
 {
+    // Set player to nullptr FIRST before deleting actors
+    // This prevents any code from accessing the player after it's deleted
+    mPlayer = nullptr;
+    
     // Remove all actors
     while (!mActors.empty())
     {
@@ -873,7 +900,6 @@ void Game::CleanupGame()
 
     mEnemies.clear();
     mProjectiles.clear();
-    mPlayer = nullptr;
 
     // --- ADICIONADO PARA O CHEFE ---
     mBosses.clear();

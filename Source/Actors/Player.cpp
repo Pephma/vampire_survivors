@@ -110,6 +110,12 @@ void Player::OnProcessInput(const Uint8* state)
 
 void Player::OnUpdate(float deltaTime)
 {
+    // Não atualiza se o jogo não está em estado Playing
+    if (GetGame()->GetState() != MenuState::Playing)
+    {
+        return;
+    }
+
     UpdateAutoAttack(deltaTime);
 
     // Orbitais (estético/jogabilidade)
@@ -155,7 +161,11 @@ void Player::OnUpdate(float deltaTime)
 
     if (mHealth <= 0.0f)
     {
-        GetGame()->GameOver();
+        // Só chama GameOver se ainda estiver em estado Playing
+        if (GetGame()->GetState() == MenuState::Playing)
+        {
+            GetGame()->GameOver();
+        }
     }
 
     // Limites do mundo
