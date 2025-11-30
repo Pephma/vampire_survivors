@@ -62,7 +62,8 @@ protected:
     class RigidBodyComponent* mRigidBodyComponent;
     class AnimatorComponent* mAnimatorComponent;
     class CircleColliderComponent* mCircleColliderComponent;
-    
+
+    class DrawComponent* mDrawComponent;
     EnemyKind mKind;
     EnemyDirection mCurrentDirection;
 

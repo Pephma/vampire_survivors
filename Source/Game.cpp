@@ -283,11 +283,11 @@ void Game::SpawnBoss(int waveNumber)
     // --- LÓGICA DE ESCOLHA DO CHEFE ---
     BossKind kind;
 
-    if (waveNumber == 5)
+    if (waveNumber == 3)
     {
         kind = BossKind::Tank;
     }
-    else if (waveNumber == 10)
+    else if (waveNumber == 6)
     {
         kind = BossKind::Sprayer;
     }
@@ -591,14 +591,16 @@ void Game::InitSpawnRules()
     mRuleTimers.clear();
     mTimedHordes.clear();
 
+
     // Regras contínuas (por intervalo)
-    mSpawnRules.push_back({ EnemyKind::Comum, 1,    0.0f,  INFINITY, 0.70f,  2 });
+    mSpawnRules.push_back({ EnemyKind::Comum, 1,    0.0f,  INFINITY, 0.70f,  4 });
     // Fast entram a partir da wave 3
-    mSpawnRules.push_back({ EnemyKind::Corredor,  3,   20.0f,  INFINITY, 1.20f,  3 });
+    mSpawnRules.push_back({ EnemyKind::Corredor,  2,   30.0f,  INFINITY, 1.50f,  3 });
     // Tanks a partir da wave 5
-    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  1,   0.0f,  INFINITY, 2.50f,  10 });
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  3,   60.0f,  INFINITY, 2.50f,  2 });
     // Elites espaçados a partir da wave 7
-    mSpawnRules.push_back({ EnemyKind::Atirador, 7,  120.0f,  INFINITY, 8.00f,  1 });
+    mSpawnRules.push_back({ EnemyKind::Atirador, 4,  120.0f,  INFINITY, 2.00f,  4 });
+
     mRuleTimers.resize(mSpawnRules.size(), 0.0f);
 
     // Hordas pontuais (burst em tempos específicos)
@@ -684,21 +686,25 @@ void Game::UpdateWaveSystem(float deltaTime)
     mElapsedSeconds += deltaTime;
     mWaveTimer      += deltaTime;
 
-    // Wave avança a cada 30s (mantendo sua lógica original)
+    // Wave avança a cada 30s
     int newWave = 1 + static_cast<int>(mWaveTimer / 30.0f);
     if (newWave > mCurrentWave)
     {
         mCurrentWave = newWave;
 
-        // --- LÓGICA DE SPAWN DO CHEFE (MODIFICADO) ---
-        // É uma onda de chefe (múltipla de 5) E ainda não spawnamos nesta wave?
-        if (mCurrentWave % 5 == 0 && mCurrentWave > mLastBossWaveSpawned)
+        // --- LÓGICA DE SPAWN DO CHEFE (ALTERADA) ---
+
+        // Verifica explicitamente se é Wave 3 OU Wave 6
+        if ((mCurrentWave == 3 || mCurrentWave == 6) && mCurrentWave > mLastBossWaveSpawned)
         {
             SpawnBoss(mCurrentWave);
             mLastBossWaveSpawned = mCurrentWave;
         }
+
         // --- FIM DA LÓGICA DO CHEFE ---
     }
+
+    // ... (o resto da função continua igual)
 
     // Limite global de população para não saturar
     const int maxEnemies = 400 + (mCurrentWave * 30);
