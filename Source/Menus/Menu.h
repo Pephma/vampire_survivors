@@ -20,6 +20,7 @@ public:
     Menu(class Game* game);
     virtual ~Menu() = default;
     
+    void ResetInput();
     virtual void ProcessInput(const Uint8* keyState);
     virtual void Draw(class Renderer* renderer);
     

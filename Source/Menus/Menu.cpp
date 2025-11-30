@@ -14,6 +14,11 @@ Menu::Menu(Game* game)
 {
 }
 
+void Menu::ResetInput()
+{
+    mLastKeyPress = SDL_GetTicks();
+}
+
 void Menu::ProcessInput(const Uint8* keyState)
 {
     Uint32 currentTime = SDL_GetTicks();

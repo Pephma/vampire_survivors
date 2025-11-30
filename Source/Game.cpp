@@ -123,7 +123,6 @@ void Game::ProcessInput()
 
     const Uint8* state = SDL_GetKeyboardState(nullptr);
 
-    // Handle menu input
     if (mGameState == MenuState::MainMenu)
     {
         mMainMenu->ProcessInput(state);
@@ -136,13 +135,19 @@ void Game::ProcessInput()
     {
         mUpgradeMenu->ProcessInput(state);
     }
+    else if (mGameState == MenuState::GameOver)
+    {
+        if (state[SDL_SCANCODE_SPACE] || state[SDL_SCANCODE_ESCAPE] || state[SDL_SCANCODE_RETURN])
+        {
+            QuitToMenu();
+        }
+    }
     else if (mGameState == MenuState::Playing)
     {
-        // Pause game with debounce
         if (state[SDL_SCANCODE_ESCAPE])
         {
             Uint32 currentTime = SDL_GetTicks();
-            if (currentTime - mLastPausePress > 300) // 300ms delay
+            if (currentTime - mLastPausePress > 300)
             {
                 PauseGame();
                 mLastPausePress = currentTime;
@@ -150,14 +155,12 @@ void Game::ProcessInput()
         }
         else
         {
-            // Reset timer when ESC is not pressed
             if (SDL_GetTicks() - mLastPausePress > 500)
             {
                 mLastPausePress = 0;
             }
         }
 
-        // Process actor input
         for (auto actor : mActors)
         {
             actor->ProcessInput(state);
@@ -381,6 +384,8 @@ void Game::QuitToMenu()
 {
     mGameState = MenuState::MainMenu;
 
+    mMainMenu->ResetInput();
+
     if (!mUpdatingActors)
     {
         CleanupGame();
@@ -395,14 +400,17 @@ void Game::QuitToMenu()
 
 void Game::GameOver()
 {
-    // Só processa se ainda estiver em estado Playing
     if (mGameState != MenuState::Playing)
     {
         return;
     }
     
-    // Volta para o menu inicial quando o player morre
-    QuitToMenu();
+    mGameState = MenuState::GameOver;
+    
+    if (mAudioSystem)
+    {
+        mAudioSystem->StopMusic();
+    }
 }
 
 void Game::ShowUpgradeMenu()
@@ -979,7 +987,7 @@ void Game::GenerateOutput()
         DrawUI();
         mUpgradeMenu->Draw(mRenderer);
     }
-    else if (mGameState == MenuState::Playing)
+    else if (mGameState == MenuState::Playing || mGameState == MenuState::GameOver)
     {
         for (auto drawable : mDrawables)
         {
@@ -988,7 +996,12 @@ void Game::GenerateOutput()
 
         DrawUI();
 
-        if (mIsDebugging)
+        if (mGameState == MenuState::GameOver)
+        {
+            TextRenderer::DrawText(mRenderer, "GAME OVER", Vector2(WINDOW_WIDTH / 2.0f - 150.0f, WINDOW_HEIGHT / 2.0f - 60.0f), 2.0f, Vector3(0.9f, 0.1f, 0.1f));
+            TextRenderer::DrawText(mRenderer, "Pressione ESPACO", Vector2(WINDOW_WIDTH / 2.0f - 120.0f, WINDOW_HEIGHT / 2.0f + 20.0f), 1.0f, Vector3(1.0f, 1.0f, 1.0f));
+        }
+        else if (mIsDebugging)
         {
             for (auto actor : mActors)
             {
