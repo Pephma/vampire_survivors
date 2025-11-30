@@ -63,8 +63,8 @@ void MainMenu::Draw(Renderer* renderer)
     renderer->Draw(titleMatrix, &titleVA, titleColor);
     
     // Draw title text
-    Vector2 titleTextPos(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f - 120.0f, 130.0f);
+    Vector2 titleTextPos(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f - 140.0f, 130.0f);
     Vector3 titleTextColor(1.0f, 1.0f, 1.0f);
-    TextRenderer::DrawText(renderer, "VAMPIRE SURVIVORS", titleTextPos, 2.0f, titleTextColor);
+    TextRenderer::DrawText(renderer, "Foge, S\xF4!", titleTextPos, 2.0f, titleTextColor);
 }
 

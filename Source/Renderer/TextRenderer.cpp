@@ -9,6 +9,11 @@ void TextRenderer::DrawText(Renderer* renderer, const std::string& text, const V
     
     for (char c : text)
     {
+        if (static_cast<unsigned char>(c) == 0xC3)
+        {
+            continue;
+        }
+        
         if (c == ' ')
         {
             currentPos.x += charWidth * 0.6f;
@@ -26,18 +31,16 @@ void TextRenderer::DrawChar(Renderer* renderer, char c, const Vector2& position,
     if (vertices.empty())
         return;
     
-    // Translate vertices to position
     for (auto& v : vertices)
     {
         v.x += position.x;
         v.y += position.y;
     }
     
-    // Convert line segments to thick filled lines using triangles
     std::vector<float> floatArray;
     std::vector<unsigned int> indices;
     
-    float lineWidth = scale * 2.0f; // Thicker lines for better visibility
+    float lineWidth = scale * 2.0f;
     
     for (size_t i = 0; i < vertices.size(); i += 2)
     {
@@ -52,12 +55,10 @@ void TextRenderer::DrawChar(Renderer* renderer, char c, const Vector2& position,
             continue;
             
         dir.Normalize();
-        Vector2 perp(-dir.y * lineWidth, dir.x * lineWidth); // Perpendicular for thickness
+        Vector2 perp(-dir.y * lineWidth, dir.x * lineWidth);
         
         unsigned int baseIdx = static_cast<unsigned int>(floatArray.size() / 3);
         
-        // Create a rectangle from the line segment (two triangles)
-        // Triangle 1
         floatArray.push_back((v1.x - perp.x / 2.0f)); floatArray.push_back((v1.y - perp.y / 2.0f)); floatArray.push_back(0.0f);
         floatArray.push_back((v1.x + perp.x / 2.0f)); floatArray.push_back((v1.y + perp.y / 2.0f)); floatArray.push_back(0.0f);
         floatArray.push_back((v2.x - perp.x / 2.0f)); floatArray.push_back((v2.y - perp.y / 2.0f)); floatArray.push_back(0.0f);
@@ -66,7 +67,6 @@ void TextRenderer::DrawChar(Renderer* renderer, char c, const Vector2& position,
         indices.push_back(baseIdx + 1);
         indices.push_back(baseIdx + 2);
         
-        // Triangle 2
         floatArray.push_back((v1.x + perp.x / 2.0f)); floatArray.push_back((v1.y + perp.y / 2.0f)); floatArray.push_back(0.0f);
         floatArray.push_back((v2.x + perp.x / 2.0f)); floatArray.push_back((v2.y + perp.y / 2.0f)); floatArray.push_back(0.0f);
         floatArray.push_back((v2.x - perp.x / 2.0f)); floatArray.push_back((v2.y - perp.y / 2.0f)); floatArray.push_back(0.0f);
@@ -87,16 +87,47 @@ void TextRenderer::DrawChar(Renderer* renderer, char c, const Vector2& position,
 std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
 {
     std::vector<Vector2> vertices;
-    c = std::toupper(c);
     
-    // Simple 7-segment style font
-    // Each character is 8x10 pixels
     float w = 3.0f * scale;
     float h = 5.0f * scale;
     
+    unsigned char uc = static_cast<unsigned char>(c);
+    
+    if (uc == 0xB4 || uc == 0xF4)
+    {
+        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
+        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
+        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
+        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
+        
+        float hatTop = -h * 0.6f;
+        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, hatTop));
+        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, hatTop));
+        
+        return vertices;
+    }
+    
+    if (c == ',')
+    {
+        vertices.emplace_back(Vector2(w/2.0f, h*1.8f)); vertices.emplace_back(Vector2(w/4.0f, h*2.4f));
+        return vertices;
+    }
+    else if (c == '!')
+    {
+        vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*1.4f));
+        vertices.emplace_back(Vector2(w/2.0f, h*1.7f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
+        return vertices;
+    }
+    else if (c == ':')
+    {
+        vertices.emplace_back(Vector2(w/2.0f, h*0.5f)); vertices.emplace_back(Vector2(w/2.0f, h*0.7f));
+        vertices.emplace_back(Vector2(w/2.0f, h*1.3f)); vertices.emplace_back(Vector2(w/2.0f, h*1.5f));
+        return vertices;
+    }
+    
+    c = std::toupper(c);
     if (c == '0')
     {
-        // Top, bottom, left top, left bottom, right top, right bottom
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
@@ -175,37 +206,37 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
     }
-    else if (c == 'H' || c == 'h')
+    else if (c == 'H')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'E' || c == 'e')
+    else if (c == 'E')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'A' || c == 'a')
+    else if (c == 'A')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'L' || c == 'l')
+    else if (c == 'L')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'T' || c == 't')
+    else if (c == 'T')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
     }
-    else if (c == 'R' || c == 'r')
+    else if (c == 'R')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
@@ -213,7 +244,7 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
     }
-    else if (c == 'S' || c == 's')
+    else if (c == 'S')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
@@ -221,14 +252,14 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'P' || c == 'p')
+    else if (c == 'P')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
     }
-    else if (c == 'D' || c == 'd')
+    else if (c == 'D')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w*0.7f, 0.0f));
@@ -236,61 +267,61 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(w*0.7f, 0.0f)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(w*0.7f, h*2.0f)); vertices.emplace_back(Vector2(w, h));
     }
-    else if (c == 'I' || c == 'i')
+    else if (c == 'I')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'N' || c == 'n')
+    else if (c == 'N')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'O' || c == 'o')
+    else if (c == 'O')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'U' || c == 'u')
+    else if (c == 'U')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'M' || c == 'm')
+    else if (c == 'M')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'X' || c == 'x')
+    else if (c == 'X')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
     }
-    else if (c == 'Y' || c == 'y')
+    else if (c == 'Y')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
         vertices.emplace_back(Vector2(w/2.0f, h)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
     }
-    else if (c == 'C' || c == 'c')
+    else if (c == 'C')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'F' || c == 'f')
+    else if (c == 'F')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
     }
-    else if (c == 'G' || c == 'g')
+    else if (c == 'G')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
@@ -298,18 +329,18 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'V' || c == 'v')
+    else if (c == 'V')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
     }
-    else if (c == 'W' || c == 'w')
+    else if (c == 'W')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
         vertices.emplace_back(Vector2(w, h*2.0f)); vertices.emplace_back(Vector2(w, 0.0f));
     }
-    else if (c == 'B' || c == 'b')
+    else if (c == 'B')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
@@ -318,24 +349,24 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
         vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'K' || c == 'k')
+    else if (c == 'K')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'J' || c == 'j')
+    else if (c == 'J')
     {
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'Z' || c == 'z')
+    else if (c == 'Z')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == 'Q' || c == 'q')
+    else if (c == 'Q')
     {
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
         vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
@@ -343,12 +374,6 @@ std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
         vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
         vertices.emplace_back(Vector2(w*0.7f, h*1.4f)); vertices.emplace_back(Vector2(w, h*2.0f));
     }
-    else if (c == ':')
-    {
-        vertices.emplace_back(Vector2(w/2.0f, h*0.5f)); vertices.emplace_back(Vector2(w/2.0f, h*0.7f));
-        vertices.emplace_back(Vector2(w/2.0f, h*1.3f)); vertices.emplace_back(Vector2(w/2.0f, h*1.5f));
-    }
     
     return vertices;
 }
-
