@@ -51,9 +51,11 @@ DrawComponent::DrawComponent(class Actor *owner, int drawOrder)
 
 DrawComponent::~DrawComponent()
 {
-    
-    mOwner->GetGame()->RemoveDrawable(this);
-
+    // Only try to remove if game is still valid
+    if (mOwner && mOwner->GetGame())
+    {
+        mOwner->GetGame()->RemoveDrawable(this);
+    }
     
     delete mDrawArray;
     mDrawArray = nullptr;

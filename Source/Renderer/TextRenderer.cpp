@@ -1,379 +1,137 @@
 #include "TextRenderer.h"
 #include "../Game.h"
-#include <cctype>
+#include "Texture.h"
+#include <SDL_ttf.h>
+#include <SDL.h>
+#include <GL/glew.h>
+
+TTF_Font* TextRenderer::sFont = nullptr;
+bool TextRenderer::sInitialized = false;
+
+bool TextRenderer::Initialize()
+{
+    if (sInitialized)
+        return true;
+    
+    // Initialize SDL_ttf
+    if (TTF_Init() == -1)
+    {
+        SDL_Log("SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError());
+        return false;
+    }
+    
+    // Try to load fonts from Assets/Fonts directory (relative to executable)
+    const char* fontPaths[] = {
+        "Assets/Fonts/PressStart2P-Regular.ttf",  // Pixel font - great for games
+        "Assets/Fonts/font.ttf",                   // Generic fallback name
+        "../Assets/Fonts/PressStart2P-Regular.ttf", // Try parent directory
+        "../../Assets/Fonts/PressStart2P-Regular.ttf", // Try build directory
+        nullptr
+    };
+    
+    int fontSize = 24; // Base size, will be scaled
+    for (int i = 0; fontPaths[i] != nullptr; ++i)
+    {
+        sFont = TTF_OpenFont(fontPaths[i], fontSize);
+        if (sFont != nullptr)
+        {
+            SDL_Log("Loaded font: %s", fontPaths[i]);
+            sInitialized = true;
+            return true;
+        }
+    }
+    
+    // If no font found, log warning but continue
+    SDL_Log("Warning: Could not load font from Assets/Fonts/. Text will not render.");
+    sInitialized = true; // Mark as initialized even without font
+    return true;
+}
+
+void TextRenderer::Shutdown()
+{
+    if (sFont)
+    {
+        TTF_CloseFont(sFont);
+        sFont = nullptr;
+    }
+    
+    if (sInitialized)
+    {
+        TTF_Quit();
+        sInitialized = false;
+    }
+}
 
 void TextRenderer::DrawText(Renderer* renderer, const std::string& text, const Vector2& position, float scale, const Vector3& color)
 {
-    Vector2 currentPos = position;
-    float charWidth = 8.0f * scale;
-    
-    for (char c : text)
+    if (!sInitialized)
     {
-        if (static_cast<unsigned char>(c) == 0xC3)
+        if (!Initialize())
         {
-            continue;
+            return;
         }
-        
-        if (c == ' ')
-        {
-            currentPos.x += charWidth * 0.6f;
-            continue;
-        }
-        
-        DrawChar(renderer, c, currentPos, scale, color);
-        currentPos.x += charWidth;
     }
-}
-
-void TextRenderer::DrawChar(Renderer* renderer, char c, const Vector2& position, float scale, const Vector3& color)
-{
-    std::vector<Vector2> vertices = GetCharVertices(c, scale);
-    if (vertices.empty())
+    
+    if (!sFont)
+    {
         return;
-    
-    for (auto& v : vertices)
-    {
-        v.x += position.x;
-        v.y += position.y;
     }
     
-    std::vector<float> floatArray;
-    std::vector<unsigned int> indices;
+    // Set font size based on scale - reduced base size for better UI scaling
+    int fontSize = static_cast<int>(10.0f * scale);
+    TTF_SetFontSize(sFont, fontSize);
     
-    float lineWidth = scale * 2.0f;
+    // Create text surface
+    SDL_Color sdlColor;
+    sdlColor.r = static_cast<Uint8>(color.x * 255.0f);
+    sdlColor.g = static_cast<Uint8>(color.y * 255.0f);
+    sdlColor.b = static_cast<Uint8>(color.z * 255.0f);
+    sdlColor.a = 255;
     
-    for (size_t i = 0; i < vertices.size(); i += 2)
+    SDL_Surface* textSurface = TTF_RenderText_Solid(sFont, text.c_str(), sdlColor);
+    if (!textSurface)
     {
-        if (i + 1 >= vertices.size())
-            break;
-            
-        Vector2 v1 = vertices[i];
-        Vector2 v2 = vertices[i + 1];
-        Vector2 dir = v2 - v1;
-        float length = dir.Length();
-        if (length < 0.01f)
-            continue;
-            
-        dir.Normalize();
-        Vector2 perp(-dir.y * lineWidth, dir.x * lineWidth);
-        
-        unsigned int baseIdx = static_cast<unsigned int>(floatArray.size() / 3);
-        
-        floatArray.push_back((v1.x - perp.x / 2.0f)); floatArray.push_back((v1.y - perp.y / 2.0f)); floatArray.push_back(0.0f);
-        floatArray.push_back((v1.x + perp.x / 2.0f)); floatArray.push_back((v1.y + perp.y / 2.0f)); floatArray.push_back(0.0f);
-        floatArray.push_back((v2.x - perp.x / 2.0f)); floatArray.push_back((v2.y - perp.y / 2.0f)); floatArray.push_back(0.0f);
-        
-        indices.push_back(baseIdx);
-        indices.push_back(baseIdx + 1);
-        indices.push_back(baseIdx + 2);
-        
-        floatArray.push_back((v1.x + perp.x / 2.0f)); floatArray.push_back((v1.y + perp.y / 2.0f)); floatArray.push_back(0.0f);
-        floatArray.push_back((v2.x + perp.x / 2.0f)); floatArray.push_back((v2.y + perp.y / 2.0f)); floatArray.push_back(0.0f);
-        floatArray.push_back((v2.x - perp.x / 2.0f)); floatArray.push_back((v2.y - perp.y / 2.0f)); floatArray.push_back(0.0f);
-        
-        indices.push_back(baseIdx + 3);
-        indices.push_back(baseIdx + 4);
-        indices.push_back(baseIdx + 5);
-    }
-    
-    if (floatArray.empty())
+        SDL_Log("Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError());
         return;
-    
-    Matrix4 matrix = Matrix4::Identity;
-    VertexArray va(floatArray.data(), static_cast<unsigned int>(floatArray.size() / 3), indices.data(), static_cast<unsigned int>(indices.size()));
-    renderer->DrawFilled(matrix, &va, color);
-}
-
-std::vector<Vector2> TextRenderer::GetCharVertices(char c, float scale)
-{
-    std::vector<Vector2> vertices;
-    
-    float w = 3.0f * scale;
-    float h = 5.0f * scale;
-    
-    unsigned char uc = static_cast<unsigned char>(c);
-    
-    if (uc == 0xB4 || uc == 0xF4)
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        
-        float hatTop = -h * 0.6f;
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, hatTop));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, hatTop));
-        
-        return vertices;
     }
     
-    if (c == ',')
+    Vector2 size(static_cast<float>(textSurface->w), static_cast<float>(textSurface->h));
+    
+    // Create a Texture object from the surface
+    Texture textTexture;
+    if (!textTexture.LoadFromSurface(textSurface))
     {
-        vertices.emplace_back(Vector2(w/2.0f, h*1.8f)); vertices.emplace_back(Vector2(w/4.0f, h*2.4f));
-        return vertices;
-    }
-    else if (c == '!')
-    {
-        vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*1.4f));
-        vertices.emplace_back(Vector2(w/2.0f, h*1.7f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-        return vertices;
-    }
-    else if (c == ':')
-    {
-        vertices.emplace_back(Vector2(w/2.0f, h*0.5f)); vertices.emplace_back(Vector2(w/2.0f, h*0.7f));
-        vertices.emplace_back(Vector2(w/2.0f, h*1.3f)); vertices.emplace_back(Vector2(w/2.0f, h*1.5f));
-        return vertices;
+        SDL_Log("Unable to create texture from text surface!");
+        SDL_FreeSurface(textSurface);
+        return;
     }
     
-    c = std::toupper(c);
-    if (c == '0')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-    }
-    else if (c == '1')
-    {
-        vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-    }
-    else if (c == '2')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '3')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '4')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '5')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '6')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '7')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '8')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '9')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == '+')
-    {
-        vertices.emplace_back(Vector2(w/2.0f, h*0.3f)); vertices.emplace_back(Vector2(w/2.0f, h*1.7f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-    }
-    else if (c == '%')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-    }
-    else if (c == 'H')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'E')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'A')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'L')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'T')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-    }
-    else if (c == 'R')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-    }
-    else if (c == 'S')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'P')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
-    }
-    else if (c == 'D')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w*0.7f, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w*0.7f, h*2.0f));
-        vertices.emplace_back(Vector2(w*0.7f, 0.0f)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w*0.7f, h*2.0f)); vertices.emplace_back(Vector2(w, h));
-    }
-    else if (c == 'I')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(w/2.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'N')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'O')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'U')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'M')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'X')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-    }
-    else if (c == 'Y')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
-        vertices.emplace_back(Vector2(w/2.0f, h)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-    }
-    else if (c == 'C')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'F')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-    }
-    else if (c == 'G')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'V')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w/2.0f, h*2.0f));
-    }
-    else if (c == 'W')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w/2.0f, h));
-        vertices.emplace_back(Vector2(w, h*2.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-    }
-    else if (c == 'B')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h));
-        vertices.emplace_back(Vector2(w, h)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'K')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, h)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'J')
-    {
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'Z')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
-    else if (c == 'Q')
-    {
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(w, 0.0f));
-        vertices.emplace_back(Vector2(0.0f, 0.0f)); vertices.emplace_back(Vector2(0.0f, h*2.0f));
-        vertices.emplace_back(Vector2(w, 0.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(0.0f, h*2.0f)); vertices.emplace_back(Vector2(w, h*2.0f));
-        vertices.emplace_back(Vector2(w*0.7f, h*1.4f)); vertices.emplace_back(Vector2(w, h*2.0f));
-    }
+    // For screen-space UI rendering:
+    // DrawTexture calculates: finalPos = position + (screenCenter - cameraPos)
+    // We want finalPos = position (the screen coordinate passed in)
+    // So: position = position + screenCenter - cameraPos
+    // Therefore: cameraPos = screenCenter
+    // And we pass position directly (already in screen coordinates)
+    Vector2 screenCenter(1024.0f / 2.0f, 768.0f / 2.0f);
     
-    return vertices;
+    // The sprite vertices are centered at (0,0), so the texture is drawn centered at the position.
+    // The position passed in is the top-left corner where text should be.
+    // To make the sprite render with its top-left at the position, we need to offset by half the size.
+    // Since sprite center is at position, and we want top-left at position:
+    // sprite top-left = position - size/2, so we need center = position + size/2
+    Vector2 centeredPos = position + Vector2(size.x * 0.5f, size.y * 0.5f);
+    
+    // Flip texture coordinates vertically because SDL_Surface is top-to-bottom
+    // but OpenGL expects bottom-to-top. TextureRect format: (x, y, width, height)
+    // We flip by using y=1.0f and height=-1.0f to reverse the V coordinate
+    Vector4 textureRect(0.0f, 1.0f, 1.0f, -1.0f);
+    
+    // Pass centered position (screen coordinates) and cameraPos = screenCenter
+    // This makes finalPos = centeredPos + screenCenter - screenCenter = centeredPos ✓
+    renderer->DrawTexture(centeredPos, size, 0.0f, Vector3(1.0f, 1.0f, 1.0f), 
+                         &textTexture, textureRect, screenCenter, false, 1.0f);
+    
+    // Clean up
+    textTexture.Unload();
+    SDL_FreeSurface(textSurface);
 }

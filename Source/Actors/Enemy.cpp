@@ -165,6 +165,13 @@ void Enemy::SetColor(const Vector3& c)
 
 void Enemy::OnUpdate(float deltaTime)
 {
+    // Don't update if game is over or player is dead
+    auto* player = GetGame()->GetPlayer();
+    if (!player || player->GetHealth() <= 0.0f || GetGame()->GetState() != MenuState::Playing)
+    {
+        return;
+    }
+    
     // movimentação geral
     ChasePlayer(deltaTime);
 
@@ -172,8 +179,7 @@ void Enemy::OnUpdate(float deltaTime)
     TryShootAtPlayer(deltaTime);
 
     // colisão com projéteis do jogador
-    auto player = GetGame()->GetPlayer();
-    if (!player) return;
+    // (player already declared above)
 
     for (auto projectile : GetGame()->GetProjectiles())
     {
@@ -194,23 +200,26 @@ void Enemy::OnUpdate(float deltaTime)
     // morte
     if (mHealth <= 0.0f)
     {
-        // Efeitos de morte
+        // Efeitos de morte - no particles, just explosion ring if explosive
         if (mExplodesOnDeath)
         {
             // Gordo Explosivo: Lógica de explosão e círculo
             DoDeathExplosion();
         }
-        else
-        {
-            // Outros inimigos: Partículas caindo
-            // (Usando uma cor cinza/branca padrão para poeira)
-            GetGame()->SpawnFallingParticles(GetPosition(), Vector3(0.8f, 0.8f, 0.8f));
-        }
 
-        // XP (acontece para todos)
-        if (player)
+        // Spawn experience orbs instead of directly giving XP
+        // Spawn very few orbs - extremely rare drops
+        int numOrbs = 1 + (int)(mExperienceValue / 50.0f);  // Very rare orbs (was 25.0f)
+        if (numOrbs > 1) numOrbs = 1;  // Maximum of 1 orb per enemy (was 2)
+        
+        for (int i = 0; i < numOrbs; ++i)
         {
-            player->AddExperience(mExperienceValue);
+            // Spawn orbs in a small circle around enemy with better spread
+            float angle = (Math::TwoPi / numOrbs) * i + Random::GetFloatRange(-0.4f, 0.4f);
+            float radius = Random::GetFloatRange(15.0f, 30.0f);  // Increased spread
+            Vector2 orbPos = GetPosition() + Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius);
+            float orbValue = mExperienceValue / numOrbs;
+            GetGame()->SpawnExperienceOrb(orbPos, orbValue);
         }
 
         SetState(ActorState::Destroy);
@@ -308,7 +317,7 @@ void Enemy::DoDeathExplosion()
     // --- Efeitos Visuais da Explosão ---
 
     // 1. Partículas da explosão (antiga SpawnDeathParticles, agora renomeada)
-    GetGame()->SpawnExplosionParticles(e, Vector3(1.0f, 0.5f, 0.2f));
+        // No particles - just damage
 
     // 2. NOVO: Anel de demarcação do raio
     GetGame()->SpawnExplosionRing(e, mExplosionRadius);
