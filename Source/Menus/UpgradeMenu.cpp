@@ -40,14 +40,28 @@ void UpgradeMenu::ProcessInput(const Uint8* keyState)
     }
     else if (keyState[SDL_SCANCODE_RETURN] || keyState[SDL_SCANCODE_SPACE])
     {
-        if (currentTime - mLastKeyPress > 200) // 200ms delay
+        if (currentTime - mLastKeyPress > 200)
         {
             if (mSelectedIndex >= 0 && mSelectedIndex < static_cast<int>(mAvailableUpgrades.size()))
             {
                 if (mAvailableUpgrades[mSelectedIndex].onSelect)
                 {
                     mAvailableUpgrades[mSelectedIndex].onSelect();
-                    mGame->ResumeGame();
+                    
+                    auto* player = mGame->GetPlayer();
+                    if (player)
+                    {
+                        player->DecrementPendingUpgrades();
+                    }
+                    
+                    if (player && player->GetPendingUpgrades() > 0)
+                    {
+                        GenerateUpgrades();
+                    }
+                    else
+                    {
+                        mGame->ResumeGame();
+                    }
                 }
             }
             mLastKeyPress = currentTime;

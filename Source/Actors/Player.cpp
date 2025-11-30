@@ -37,6 +37,7 @@ Player::Player(class Game* game)
     , mExperience(0.0f)
     , mExperienceToNextLevel(100.0f)
     , mLevel(1)
+    , mPendingUpgrades(0)
     , mCurrentDirection(PlayerDirection::Front)
 {
     float radius = 16.0f;
@@ -208,9 +209,8 @@ void Player::AddExperience(float exp)
         mExperience -= mExperienceToNextLevel;
         mLevel++;
         mExperienceToNextLevel *= 1.5f;
-
+        mPendingUpgrades++;
         GetGame()->AddScreenShake(8.0f, 0.3f);
-        GetGame()->ShowUpgradeMenu();
     }
 }
 

@@ -161,6 +161,14 @@ void Game::ProcessInput()
             }
         }
 
+        if (state[SDL_SCANCODE_U])
+        {
+            if (mPlayer && mPlayer->GetPendingUpgrades() > 0)
+            {
+                ShowUpgradeMenu();
+            }
+        }
+
         for (auto actor : mActors)
         {
             actor->ProcessInput(state);
@@ -892,6 +900,20 @@ void Game::DrawUI()
         }
     }
     // --- ⬆️ FIM DO BLOCO ADICIONADO ⬆️ ---
+
+    if (mPlayer && mPlayer->GetPendingUpgrades() > 0)
+    {
+        std::string upgradeText = "LEVEL UP! PRESS [U] (" + std::to_string(mPlayer->GetPendingUpgrades()) + ")";
+        
+        if (static_cast<int>(SDL_GetTicks() / 500) % 2 == 0)
+        {
+            TextRenderer::DrawText(mRenderer, upgradeText, Vector2(WINDOW_WIDTH / 2.0f - 180.0f, 100.0f), 1.2f, Vector3(1.0f, 1.0f, 0.0f));
+        }
+        else
+        {
+            TextRenderer::DrawText(mRenderer, upgradeText, Vector2(WINDOW_WIDTH / 2.0f - 180.0f, 100.0f), 1.2f, Vector3(1.0f, 1.0f, 1.0f));
+        }
+    }
 }
 
 void Game::CleanupGame()

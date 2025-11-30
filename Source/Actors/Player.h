@@ -59,6 +59,8 @@ public:
     float GetExperience() const { return mExperience; }
     float GetExperienceToNextLevel() const { return mExperienceToNextLevel; }
     int GetLevel() const { return mLevel; }
+    int GetPendingUpgrades() const { return mPendingUpgrades; }
+    void DecrementPendingUpgrades() { if (mPendingUpgrades > 0) mPendingUpgrades--; }
     
     // Auto-attack system
     void UpdateAutoAttack(float deltaTime);
@@ -99,6 +101,7 @@ private:
     float mExperience;
     float mExperienceToNextLevel;
     int mLevel;
+    int mPendingUpgrades;
     
     class AnimatorComponent* mAnimatorComponent;
     class RigidBodyComponent* mRigidBodyComponent;
