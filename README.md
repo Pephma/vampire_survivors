@@ -8,7 +8,7 @@
 
 ![enemy-3](https://github.com/user-attachments/assets/5b0a040a-4979-49ca-b0d0-18ccf645b4db)
 
-A mecânica principal foca na movimentação estratégica ("kiting") e no gerenciamento de atributos. O personagem ataca automaticamente os inimigos mais próximos, permitindo que o jogador concentre sua atenção em desviar de perigos, navegar pelo mapa e ganhar experiência e novas habilidades. O
+A mecânica principal foca na movimentação estratégica ("kiting") e no gerenciamento de atributos. O personagem ataca automaticamente os inimigos mais próximos, permitindo que o jogador concentre sua atenção em desviar de perigos, navegar pelo mapa e ganhar experiência e novas habilidades. 
 ![improvements](https://github.com/user-attachments/assets/547b933b-45d4-4c65-9441-89c11bc366e9)
 
 
