@@ -137,37 +137,26 @@ void Boss::ChangeState(BossState newState)
             break;
     }
 }
+// Em Actors/Boss.cpp
+
 void Boss::OnUpdate(float deltaTime)
 {
-    // 1. Lógica de Morte (essencial)
+    // 1. Lógica de Morte
     if (mHealth <= 0.0f)
     {
-        // Spawn experience orbs from boss
-        int numOrbs = 5 + Random::GetIntRange(0, 5);  // 5-10 orbs
-        for (int i = 0; i < numOrbs; ++i)
+        if (auto* player = GetGame()->GetPlayer())
         {
-            float angle = (Math::TwoPi / numOrbs) * i + Random::GetFloatRange(-0.5f, 0.5f);
-            float distance = 30.0f + Random::GetFloatRange(-10.0f, 10.0f);
-            Vector2 orbPos = GetPosition() + Vector2(Math::Cos(angle) * distance, Math::Sin(angle) * distance);
-            GetGame()->SpawnExperienceOrb(orbPos, mExperienceValue / numOrbs);
+            player->AddExperience(mExperienceValue);
         }
-
-        // Efeito de morte grande
         GetGame()->SpawnExplosionParticles(GetPosition(), Vector3(1.0f, 0.0f, 1.0f));
         GetGame()->SpawnExplosionParticles(GetPosition(), Vector3(1.0f, 1.0f, 1.0f));
         GetGame()->AddScreenShake(10.0f, 0.5f);
 
         SetState(ActorState::Destroy);
-        return; // Para a execução
+        return;
     }
 
-    // 2. Lógica de Colisão com Projéteis
-    // Boss inherits from Enemy, so projectile collision is handled in Projectile::OnUpdate
-    // which checks GetEnemies(). Since Boss is added to enemies list via Enemy constructor,
-    // collisions should work automatically. No additional handling needed here.
-
-
-    // 3. A Máquina de Estados (O Padrão de Ataque)
+    // 3. A Máquina de Estados
     mStateTimer -= deltaTime;
 
     switch (mBossState)
@@ -176,85 +165,72 @@ void Boss::OnUpdate(float deltaTime)
         case BossState::Chasing: UpdateChasing(deltaTime); break;
         case BossState::Cooldown: UpdateCooldown(deltaTime); break;
 
-        // Ataques
+        // Ataques do TANK
         case BossState::BurstAttack: UpdateBurstAttack(deltaTime); break;
-        case BossState::SpiralAttack: UpdateSpiralAttack(deltaTime); break;
         case BossState::Telegraphing: UpdateTelegraphing(deltaTime); break;
         case BossState::Dashing: UpdateDashing(deltaTime); break;
         case BossState::Bombing: UpdateBombing(deltaTime); break;
+
+        // --- ATAQUES DO SPRAYER (FALTAVAM ESTES!) ---
+        case BossState::SpiralAttack: UpdateSpiralAttack(deltaTime); break;
+        case BossState::ConeAttack: UpdateConeAttack(deltaTime); break; // <-- Faltava este
+        case BossState::MineLayer: UpdateMineLayer(deltaTime); break;   // <-- Faltava este
+        case BossState::FireBeam: UpdateFireBeam(deltaTime); break;     // <-- Faltava este
     }
 
-    // 4. Mudar de estado se o tempo acabou
+    // 4. Transição de Estados
     if (mStateTimer <= 0.0f)
     {
-        // --- LÓGICA DE MOVIMENTO/PADRÃO BASEADA NO TIPO ---
-
-        // --- Padrão do TANK (MODIFICADO) ---
+        // TANK
         if (mKind == BossKind::Tank)
         {
             if (mBossState == BossState::Chasing)
             {
-                // Escolhe o próximo ataque baseado no índice
                 if (mAttackIndex == 0)      ChangeState(BossState::BurstAttack);
                 else if (mAttackIndex == 1)
                 {
-                    mAttackCounter = 3; // <-- PREPARA 3 INVESTIDAS
-                    ChangeState(BossState::Telegraphing); // Inicia a primeira investida
+                    mAttackCounter = 3;
+                    ChangeState(BossState::Telegraphing);
                 }
                 else if (mAttackIndex == 2) ChangeState(BossState::Bombing);
-
-                // Avança o índice para o próximo ataque na rotação
-                mAttackIndex = (mAttackIndex + 1) % 3; // Rotação 0, 1, 2
+                mAttackIndex = (mAttackIndex + 1) % 3;
             }
-
-            // --- Início do Loop da Investida ---
             else if (mBossState == BossState::Telegraphing)
             {
-                ChangeState(BossState::Dashing); // Mira -> Corre
+                ChangeState(BossState::Dashing);
             }
             else if (mBossState == BossState::Dashing)
             {
-                mAttackCounter--; // Investida executada
-                if (mAttackCounter > 0)
-                {
-                    ChangeState(BossState::Telegraphing); // Ainda tem investidas? Mira de novo.
-                }
-                else
-                {
-                    ChangeState(BossState::Cooldown); // Acabou? Descansa.
-                }
+                mAttackCounter--;
+                if (mAttackCounter > 0) ChangeState(BossState::Telegraphing);
+                else ChangeState(BossState::Cooldown);
             }
-            // --- Fim do Loop da Investida ---
-
-            // Outros ataques (Burst, Bombing) vão para Cooldown
-            else if (mBossState == BossState::BurstAttack ||
-                     mBossState == BossState::Bombing)
+            else if (mBossState == BossState::BurstAttack || mBossState == BossState::Bombing)
             {
                 ChangeState(BossState::Cooldown);
             }
-            // Volta a perseguir
             else if (mBossState == BossState::Spawning || mBossState == BossState::Cooldown)
             {
                 ChangeState(BossState::Chasing);
             }
         }
-        // Padrão do SPRAYER (Sem mudança)
+        // SPRAYER
         else if (mKind == BossKind::Sprayer)
         {
             if (mBossState == BossState::Chasing)
             {
-                // Escolhe o próximo ataque (agora 4 ataques)
+                // Rotação de ataques: 0->1->2->3->0...
                 if (mAttackIndex == 0)      ChangeState(BossState::SpiralAttack);
                 else if (mAttackIndex == 1) ChangeState(BossState::ConeAttack);
                 else if (mAttackIndex == 2) ChangeState(BossState::MineLayer);
                 else if (mAttackIndex == 3)
                 {
-                    mAttackCounter = 5; // Prepara 5 tiros de sniper
+                    mAttackCounter = 5;
                     ChangeState(BossState::Telegraphing);
                 }
-
-                mAttackIndex = (mAttackIndex + 1) % 4; // Rotação 0, 1, 2, 3
+                mAttackIndex = (mAttackIndex + 1) % 4;
             }
+            // Loop do Sniper Shot
             else if (mBossState == BossState::Telegraphing)
             {
                 ChangeState(BossState::FireBeam);
@@ -262,15 +238,10 @@ void Boss::OnUpdate(float deltaTime)
             else if (mBossState == BossState::FireBeam)
             {
                 mAttackCounter--;
-                if (mAttackCounter > 0)
-                {
-                    ChangeState(BossState::Telegraphing);
-                }
-                else
-                {
-                    ChangeState(BossState::Cooldown);
-                }
+                if (mAttackCounter > 0) ChangeState(BossState::Telegraphing);
+                else ChangeState(BossState::Cooldown);
             }
+            // Outros ataques vão para Cooldown
             else if (mBossState == BossState::SpiralAttack ||
                      mBossState == BossState::ConeAttack ||
                      mBossState == BossState::MineLayer)
