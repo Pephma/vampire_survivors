@@ -90,7 +90,7 @@ bool Game::Initialize()
 
     mRenderer = new Renderer(mWindow);
     mRenderer->Initialize(WINDOW_WIDTH, WINDOW_HEIGHT);
-    
+
     // Initialize text renderer
     TextRenderer::Initialize();
 
@@ -245,7 +245,7 @@ void Game::UpdateActors(float deltaTime)
     {
         deltaTime = 0.033f;
     }
-    
+
     // Update combo system
     if (mComboTimer > 0.0f)
     {
@@ -255,14 +255,14 @@ void Game::UpdateActors(float deltaTime)
             // Combo expired
             if (mCombo > 0)
             {
-                SpawnFloatingText(mPlayer ? mPlayer->GetPosition() : Vector2(WINDOW_WIDTH/2.0f, WINDOW_HEIGHT/2.0f), 
+                SpawnFloatingText(mPlayer ? mPlayer->GetPosition() : Vector2(WINDOW_WIDTH/2.0f, WINDOW_HEIGHT/2.0f),
                     "COMBO ENDED!", Vector3(0.8f, 0.2f, 0.2f));
             }
             mCombo = 0;
             mComboMultiplier = 1.0f;
         }
     }
-    
+
     mUpdatingActors = true;
 
     // Create a copy of actors to iterate over safely
@@ -279,22 +279,22 @@ void Game::UpdateActors(float deltaTime)
         
         // Safety checks
         if (!actor) continue;
-        
+
         // Check if actor is still in the main list (might have been removed)
         auto it = std::find(mActors.begin(), mActors.end(), actor);
         if (it == mActors.end())
         {
             continue;  // Actor was removed, skip it
         }
-        
+
         // Don't update if already destroyed
         if (actor->GetState() == ActorState::Destroy)
         {
             continue;
         }
-        
+
         actor->Update(deltaTime);
-        
+
         // Check state again after update - it might have changed
         if (mGameState != MenuState::Playing)
         {
@@ -309,7 +309,7 @@ void Game::UpdateActors(float deltaTime)
         mActors.emplace_back(pending);
     }
     mPendingActors.clear();
-    
+
     // Process deferred experience AFTER all updates are done
     // This prevents state changes during actor updates
     if (mPlayer && !mDeferredExperience.empty())
@@ -327,17 +327,17 @@ void Game::UpdateActors(float deltaTime)
     // This avoids iterator invalidation and accessing corrupted memory
     std::vector<size_t> indicesToDelete;
     std::vector<Actor*> actorsToDelete;
-    
+
     // First pass: identify actors to delete
     for (size_t i = 0; i < mActors.size(); ++i)
     {
         Actor* actor = mActors[i];
-        if (!actor) 
+        if (!actor)
         {
             indicesToDelete.push_back(i);
             continue;
         }
-        
+
         // Check state - if destroyed, mark for deletion
         // Simple approach: just check state directly
         // If actor is corrupted, the crash will happen here, but at least we've isolated it
@@ -345,7 +345,7 @@ void Game::UpdateActors(float deltaTime)
         {
             indicesToDelete.push_back(i);
             actorsToDelete.push_back(actor);
-            
+
             // Remove from experience orbs list if it's an ExperienceOrb (before deletion)
             ExperienceOrb* orb = dynamic_cast<ExperienceOrb*>(actor);
             if (orb)
@@ -354,7 +354,7 @@ void Game::UpdateActors(float deltaTime)
             }
         }
     }
-    
+
     // Second pass: remove from mActors (iterate backwards to maintain indices)
     for (int i = static_cast<int>(indicesToDelete.size()) - 1; i >= 0; --i)
     {
@@ -364,7 +364,7 @@ void Game::UpdateActors(float deltaTime)
             mActors.erase(mActors.begin() + idx);
         }
     }
-    
+
     // Third pass: delete the actors
     // Their destructors will call RemoveActor, but since we've already removed them
     // and mUpdatingActors is true, RemoveActor will safely return
@@ -406,17 +406,16 @@ void Game::RemoveBoss(Boss* boss)
     }
 }
 
-
 void Game::SpawnBoss(int waveNumber)
 {
     // --- LÓGICA DE ESCOLHA DO CHEFE ---
     BossKind kind;
 
-    if (waveNumber == 5)
+    if (waveNumber == 3)
     {
         kind = BossKind::Tank;
     }
-    else if (waveNumber == 10)
+    else if (waveNumber == 6)
     {
         kind = BossKind::Sprayer;
     }
@@ -482,7 +481,7 @@ void Game::AddExperienceOrb(ExperienceOrb* orb)
 void Game::RemoveExperienceOrb(ExperienceOrb* orb)
 {
     if (!orb) return;
-    
+
     // Safely remove from list using manual iteration to avoid any issues
     // This is more defensive than erase-remove and handles edge cases better
     for (auto it = mExperienceOrbs.begin(); it != mExperienceOrbs.end(); )
@@ -554,20 +553,20 @@ void Game::OnEnemyKilled(const Vector2& position)
     {
         return;
     }
-    
+
     AddKill();
-    
+
     // Reset combo timer
     mComboTimer = COMBO_TIMEOUT;
     mCombo++;
-    
+
     // Calculate combo multiplier (capped at MAX_COMBO_MULTIPLIER)
     mComboMultiplier = 1.0f + (mCombo * 0.05f); // +5% per kill
     if (mComboMultiplier > MAX_COMBO_MULTIPLIER)
     {
         mComboMultiplier = MAX_COMBO_MULTIPLIER;
     }
-    
+
     // Visual feedback for combos - only spawn if we have a valid renderer
     if (mRenderer && mCombo > 0)
     {
@@ -582,7 +581,7 @@ void Game::OnEnemyKilled(const Vector2& position)
         }
     }
     */
-    
+
     // Just track kills for now, no combo system
     AddKill();
 }
@@ -659,13 +658,13 @@ void Game::GameOver()
     {
         mPlayer->SetState(ActorState::Paused);
     }
-    
+
     // Stop all enemies from moving/chasing - they'll stop updating in their OnUpdate
     // The state check in Enemy::OnUpdate will prevent them from chasing
-    
+
     // Stop wave system updates
     // (Already handled by UpdateGame checking mGameState)
-    
+
     if (mAudioSystem)
     {
         mAudioSystem->StopMusic();
@@ -679,7 +678,7 @@ void Game::ShowUpgradeMenu()
     {
         return;
     }
-    
+
     mGameState = MenuState::UpgradeMenu;
     mUpgradeMenu->GenerateUpgrades();
 }
@@ -705,7 +704,7 @@ void Game::UpdateCamera(float deltaTime)
         float shakeY = Random::GetFloatRange(-mScreenShakeAmount, mScreenShakeAmount);
         mCameraPosition.x += shakeX;
         mCameraPosition.y += shakeY;
-        
+
         mScreenShakeDuration -= deltaTime;
         // Better decay curve - exponential falloff
         mScreenShakeAmount *= (1.0f - deltaTime * 10.0f);  // Faster decay for snappier feel
@@ -853,14 +852,16 @@ void Game::InitSpawnRules()
     mRuleTimers.clear();
     mTimedHordes.clear();
 
-    // Regras contínuas (por intervalo) - Spectacular Vampire Survivors balance
-    mSpawnRules.push_back({ EnemyKind::Comum, 1,    0.0f,  INF, 0.4f,  5 });  // More enemies, faster spawn for intensity
-    // Fast enemies from wave 2
-    mSpawnRules.push_back({ EnemyKind::Corredor,  2,   8.0f,  INF, 0.7f,  4 });  // Earlier, more frequent
-    // Tanks from wave 3
-    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  3,   20.0f,  INF, 2.2f,  7 });  // More per spawn for impact
-    // Elites from wave 4 (earlier for challenge)
-    mSpawnRules.push_back({ EnemyKind::Atirador, 4,  40.0f,  INF, 4.5f,  4 });  // More frequent, more per spawn
+
+    // Regras contínuas (por intervalo)
+    mSpawnRules.push_back({ EnemyKind::Comum, 1,    0.0f,  INFINITY, 0.70f,  4 });
+    // Fast entram a partir da wave 3
+    mSpawnRules.push_back({ EnemyKind::Corredor,  2,   30.0f,  INFINITY, 1.50f,  3 });
+    // Tanks a partir da wave 5
+    mSpawnRules.push_back({ EnemyKind::GordoExplosivo,  3,   60.0f,  INFINITY, 2.50f,  2 });
+    // Elites espaçados a partir da wave 7
+    mSpawnRules.push_back({ EnemyKind::Atirador, 4,  120.0f,  INFINITY, 2.00f,  4 });
+
     mRuleTimers.resize(mSpawnRules.size(), 0.0f);
 
     // Hordas pontuais (burst em tempos específicos) - More intense hordes
@@ -955,9 +956,10 @@ void Game::UpdateWaveSystem(float deltaTime)
     {
         mCurrentWave = newWave;
 
-        // --- LÓGICA DE SPAWN DO CHEFE (MODIFICADO) ---
-        // É uma onda de chefe (múltipla de 5) E ainda não spawnamos nesta wave?
-        if (mCurrentWave % 5 == 0 && mCurrentWave > mLastBossWaveSpawned)
+        // --- LÓGICA DE SPAWN DO CHEFE (ALTERADA) ---
+
+        // Verifica explicitamente se é Wave 3 OU Wave 6
+        if ((mCurrentWave == 3 || mCurrentWave == 6) && mCurrentWave > mLastBossWaveSpawned)
         {
             SpawnBoss(mCurrentWave);
             mLastBossWaveSpawned = mCurrentWave;
@@ -1113,17 +1115,17 @@ void Game::DrawUI()
     std::string levelText = "LVL " + std::to_string(mPlayer->GetLevel());
     float levelGlow = 0.95f + 0.05f * Math::Sin(ticks * 0.008f);  // Subtle glow
     TextRenderer::DrawText(mRenderer, levelText, Vector2(250.0f, 25.0f), 0.9f * levelGlow, Vector3(1.0f, 0.95f, 0.2f));
-    
+
     // Time survived display
     int minutes = static_cast<int>(mElapsedSeconds) / 60;
     int seconds = static_cast<int>(mElapsedSeconds) % 60;
     std::string timeText = std::to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + std::to_string(seconds);
     TextRenderer::DrawText(mRenderer, timeText, Vector2(static_cast<float>(WINDOW_WIDTH) - 140.0f, 65.0f), 0.7f, Vector3(0.7f, 0.7f, 0.9f));
-    
+
     // Kill counter
     std::string killText = "KILLS: " + std::to_string(mKills);
     TextRenderer::DrawText(mRenderer, killText, Vector2(static_cast<float>(WINDOW_WIDTH) - 140.0f, 85.0f), 0.7f, Vector3(0.9f, 0.5f, 0.2f));
-    
+
     // Combo display (only show if combo is active)
     if (mCombo > 0)
     {
@@ -1131,16 +1133,16 @@ void Game::DrawUI()
         float comboScale = 1.0f + (mCombo / 50.0f) * 0.3f; // Scale up with combo
         Vector3 comboColor(1.0f, 0.8f + (mCombo / 100.0f) * 0.2f, 0.2f); // Get more yellow with higher combo
         TextRenderer::DrawText(mRenderer, comboText, Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f - 80.0f, 100.0f), comboScale, comboColor);
-        
+
         // Combo multiplier
         std::string multText = std::to_string((int)(mComboMultiplier * 100.0f)) + "% XP";
         TextRenderer::DrawText(mRenderer, multText, Vector2(static_cast<float>(WINDOW_WIDTH) / 2.0f - 50.0f, 130.0f), 0.8f, Vector3(0.2f, 1.0f, 0.5f));
     }
-    
+
     // Health text - improved visibility
     std::string healthText = std::to_string((int)mPlayer->GetHealth()) + "/" + std::to_string((int)mPlayer->GetMaxHealth());
     TextRenderer::DrawText(mRenderer, healthText, Vector2(230.0f, 5.0f), 0.75f, Vector3(1.0f, 0.4f, 0.4f));
-    
+
     // Stats panel (top right) - only show if player has upgrades
     float statsY = 80.0f;
     if (mPlayer->GetDamageMultiplier() > 1.1f || mPlayer->GetAttackSpeedMultiplier() > 1.1f)
@@ -1148,26 +1150,26 @@ void Game::DrawUI()
         std::string damageText = "DMG: " + std::to_string((int)(mPlayer->GetDamageMultiplier() * 100.0f)) + "%";
         TextRenderer::DrawText(mRenderer, damageText, Vector2(static_cast<float>(WINDOW_WIDTH) - 200.0f, statsY), 0.7f, Vector3(1.0f, 0.3f, 0.3f));
         statsY += 20.0f;
-        
+
         std::string speedText = "SPD: " + std::to_string((int)(mPlayer->GetAttackSpeedMultiplier() * 100.0f)) + "%";
         TextRenderer::DrawText(mRenderer, speedText, Vector2(static_cast<float>(WINDOW_WIDTH) - 200.0f, statsY), 0.7f, Vector3(0.3f, 1.0f, 0.3f));
         statsY += 20.0f;
     }
-    
+
     if (mPlayer->GetCritChance() > 0.0f)
     {
         std::string critText = "CRIT: " + std::to_string((int)(mPlayer->GetCritChance() * 100.0f)) + "%";
         TextRenderer::DrawText(mRenderer, critText, Vector2(static_cast<float>(WINDOW_WIDTH) - 200.0f, statsY), 0.7f, Vector3(1.0f, 0.8f, 0.0f));
         statsY += 20.0f;
     }
-    
+
     if (mPlayer->HasLifesteal())
     {
         std::string lifestealText = "LIFESTEAL: " + std::to_string((int)(mPlayer->GetLifestealPercent() * 100.0f)) + "%";
         TextRenderer::DrawText(mRenderer, lifestealText, Vector2(static_cast<float>(WINDOW_WIDTH) - 200.0f, statsY), 0.7f, Vector3(1.0f, 0.0f, 0.5f));
         statsY += 20.0f;
     }
-    
+
     // Active weapon modes
     if (mPlayer->GetProjectilePierce() > 0)
     {
@@ -1260,10 +1262,10 @@ void Game::CleanupGame()
     mBosses.clear();
     mExperienceOrbs.clear();
     mDeferredExperience.clear();
-    
+
     // Clear drawables before deleting actors (their destructors try to remove themselves)
     mDrawables.clear();
-    
+
     // Remove all actors (this will delete them)
     // Their destructors might try to remove themselves from vectors, but we've already cleared them
     while (!mActors.empty())
@@ -1289,14 +1291,14 @@ void Game::AddActor(Actor* actor)
 void Game::RemoveActor(Actor* actor)
 {
     if (!actor) return;  // Safety check
-    
+
     // Don't remove if we're currently updating actors (to avoid iterator invalidation)
     // The UpdateActors function handles removal itself
     if (mUpdatingActors)
     {
         return;
     }
-    
+
     // Remove from pending actors first
     auto iter = std::find(mPendingActors.begin(), mPendingActors.end(), actor);
     if (iter != mPendingActors.end())
@@ -1312,7 +1314,7 @@ void Game::RemoveActor(Actor* actor)
         std::iter_swap(iter, mActors.end() - 1);
         mActors.pop_back();
     }
-    
+
     // Note: It's safe if the actor isn't found - this can happen if it was
     // already removed manually before deletion (which we do in UpdateActors)
 }
@@ -1378,7 +1380,7 @@ void Game::GenerateOutput()
             std::string waveText = "Wave: " + std::to_string(mCurrentWave);
             std::string levelText = "Level: " + std::to_string(mPlayer ? mPlayer->GetLevel() : 0);
             std::string restartText = "Press SPACE to restart";
-            
+
             TextRenderer::DrawText(mRenderer, gameOverText, Vector2(WINDOW_WIDTH / 2.0f - 180.0f, WINDOW_HEIGHT / 2.0f - 80.0f), 2.2f, Vector3(0.95f, 0.1f, 0.1f));
             TextRenderer::DrawText(mRenderer, waveText, Vector2(WINDOW_WIDTH / 2.0f - 80.0f, WINDOW_HEIGHT / 2.0f - 20.0f), 1.2f, Vector3(1.0f, 0.9f, 0.3f));
             TextRenderer::DrawText(mRenderer, levelText, Vector2(WINDOW_WIDTH / 2.0f - 80.0f, WINDOW_HEIGHT / 2.0f + 10.0f), 1.2f, Vector3(1.0f, 0.9f, 0.3f));
