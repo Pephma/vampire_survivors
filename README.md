@@ -30,6 +30,8 @@ Pedimos aos jogadores que observem com atenção os seguintes pontos durante o *
 * **Sistema de Level Up:** Verificar se a coleta de XP preenche a barra e se o menu de Upgrade (pressionando **'U'**) aplica corretamente os bônus de atributo.
 * **Performance:** Observar se há queda brusca de FPS quando há muitos inimigos na tela.
 
+## Slides: https://docs.google.com/presentation/d/1rJDios4CzPCE_FRSopdbR75hBvmRwSqG-SZwFkYg7Eg/edit?usp=sharing
+
 ## Créditos
 
 * **Pedro Henrique Meireles de Almeida** – *Programação da Engine, Física, Colisão, Protótipo Inicial, Sistema de Gameplay (XP, Upgrades) e Balanceamento.*
