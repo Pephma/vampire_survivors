@@ -257,6 +257,7 @@ add_executable(${PROJECT_NAME}
         Source/Actors/ExperienceOrb.h
         Source/Components/AnimatorComponent.cpp
         Source/Renderer/Texture.cpp
+        Source/Actors/Background.cpp
 )
 
 # Link libraries

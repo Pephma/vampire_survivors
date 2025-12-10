@@ -14,6 +14,7 @@
 #include "Actors/Boss.h" // <-- INCLUÍDO O CHEFE
 #include "Actors/ExperienceOrb.h"
 #include "Actors/FloatingText.h"
+#include "Actors/Background.h"
 #include "Menus/MainMenu.h"
 #include "Menus/PauseMenu.h"
 #include "Menus/UpgradeMenu.h"
@@ -44,6 +45,7 @@ Game::Game()
         , mPauseMenu(nullptr)
         , mUpgradeMenu(nullptr)
         , mPlayer(nullptr)
+        , mBackground(nullptr)
         , mCurrentWave(1)
         , mWaveTimer(0.0f)
         , mNextWaveTimer(5.0f)
@@ -109,6 +111,8 @@ bool Game::Initialize()
 
 void Game::InitializeActors()
 {
+    mBackground = new Background(this);
+    
     mPlayer = new Player(this);
     mPlayer->SetPosition(Vector2(static_cast<float>(WORLD_WIDTH) / 2.0f, static_cast<float>(WORLD_HEIGHT) / 2.0f));
     mCameraPosition = Vector2(static_cast<float>(WORLD_WIDTH) / 2.0f, static_cast<float>(WORLD_HEIGHT) / 2.0f);
@@ -1348,6 +1352,11 @@ void Game::GenerateOutput()
     }
     else if (mGameState == MenuState::Paused)
     {
+        if (mBackground)
+        {
+            mBackground->Draw(mRenderer);
+        }
+        
         for (auto drawable : mDrawables)
         {
             drawable->Draw(mRenderer);
@@ -1357,6 +1366,11 @@ void Game::GenerateOutput()
     }
     else if (mGameState == MenuState::UpgradeMenu)
     {
+        if (mBackground)
+        {
+            mBackground->Draw(mRenderer);
+        }
+        
         for (auto drawable : mDrawables)
         {
             drawable->Draw(mRenderer);
@@ -1366,6 +1380,11 @@ void Game::GenerateOutput()
     }
     else if (mGameState == MenuState::Playing || mGameState == MenuState::GameOver)
     {
+        if (mBackground)
+        {
+            mBackground->Draw(mRenderer);
+        }
+        
         for (auto drawable : mDrawables)
         {
             drawable->Draw(mRenderer);

@@ -185,6 +185,9 @@ private:
     // Deferred experience system - prevents crashes from state changes during updates
     std::vector<DeferredExperience> mDeferredExperience;
 
+    // Background
+    class Background* mBackground;
+
     // -------------------------------
     // NOVAS VARIÁVEIS DE WAVE/SPAWN
     // -------------------------------

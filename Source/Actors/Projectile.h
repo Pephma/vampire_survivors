@@ -48,6 +48,8 @@ private:
     
     // Explosive system
     bool mExplosive;
+    
+    class AnimatorComponent* mAnimatorComponent;
     float mExplosionRadius;
 
     class DrawComponent*        mDrawComponent;

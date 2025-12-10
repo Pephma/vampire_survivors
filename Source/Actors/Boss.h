@@ -22,6 +22,14 @@ enum class BossState
     FireBeam      // NOVO (Raio Telegrafado)
 };
 
+enum class BossDirection
+{
+    Front,
+    Back,
+    Left,
+    Right
+};
+
 class Boss : public Enemy
 {
 public:
@@ -49,6 +57,9 @@ private:
     void UpdateMineLayer(float deltaTime);
     void UpdateFireBeam(float deltaTime);
 
+    void UpdateAnimation(Vector2& directionToPlayer);
+    void ChasePlayer(float deltaTime);
+
     // Variáveis
     BossState mBossState;
     BossKind mKind;
@@ -61,7 +72,6 @@ private:
     int mAttackIndex;
     Vector3 mBossColor;
 
-    int mAttackCounter; // Para contar múltiplos ataques (ex: Sniper)
-    
-    class DrawComponent* mBossDrawComponent;
+    int mAttackCounter;
+    BossDirection mCurrentDirection;
 };

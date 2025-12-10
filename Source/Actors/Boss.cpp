@@ -21,6 +21,7 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
     , mAttackIndex(0)                 // Inicializa o índice de rotação de ataques
     , mBossColor(Vector3::One)        // Inicializa a cor base
     , mAttackCounter(0) // <-- ADICIONE A INICIALIZAÇÃO
+    , mCurrentDirection(BossDirection::Front)
 {
     game->AddBoss(this);
     // (Não removemos o inimigo daqui, pois o ~Enemy já faz isso na morte)
@@ -52,28 +53,35 @@ Boss::Boss(Game* game, BossKind kind, int waveLevel)
     mMaxHealth = mHealth; // Importante para a barra de vida
     mSpeed = baseSpeed + (waveLevel * 2.0f);
 
-    // --- CORREÇÃO DO CHEFE INVISÍVEL E TRAVAMENTO (DOUBLE DELETE) ---
-
-    auto iter = std::find(mComponents.begin(), mComponents.end(), (Component*)mAnimatorComponent);
-    if (iter != mComponents.end())
+    if (mAnimatorComponent)
     {
-        mComponents.erase(iter);
+        auto iter = std::find(mComponents.begin(), mComponents.end(), (Component*)mAnimatorComponent);
+        if (iter != mComponents.end())
+        {
+            mComponents.erase(iter);
+        }
+        delete mAnimatorComponent;
+        mAnimatorComponent = nullptr;
     }
 
-    // 3. Recria os vértices com o RAIO CORRETO (baseRadius)
-    std::vector<Vector2> vertices;
-    const int numVertices = 20;
-    for (int i = 0; i < numVertices; ++i)
-    {
-        float angle = (Math::TwoPi / numVertices) * i;
-        vertices.emplace_back(Vector2(Math::Cos(angle) * baseRadius, Math::Sin(angle) * baseRadius));
-    }
 
-    mBossDrawComponent = new DrawComponent(this, vertices);
-    mBossDrawComponent->SetColor(mBossColor);
-    mBossDrawComponent->SetFilled(true);
+    mAnimatorComponent = new AnimatorComponent(this,
+        "../Assets/Sprites/Boss/Boss.png",
+        "../Assets/Sprites/Boss/Boss.json",
+        32,
+        32
+    );
+    
+    mAnimatorComponent->AddAnimation("Back", {0, 2, 4});
+    mAnimatorComponent->AddAnimation("Front", {1, 5, 6});
+    mAnimatorComponent->AddAnimation("Left", {3, 7, 8});
+    mAnimatorComponent->AddAnimation("Right", {3, 7, 8});
+    
+    mAnimatorComponent->SetAnimation("Front");
+    mAnimatorComponent->SetAnimFPS(6.0f);
+    
+    SetScale(Vector2(1.0f, -1.0f));
 
-    // 5. Atualiza o RAIO DE COLISÃO
     mCircleColliderComponent->SetRadius(baseRadius);
     // -------------------------------------------
 
@@ -305,10 +313,6 @@ void Boss::UpdateSpiralAttack(float deltaTime)
 void Boss::UpdateCooldown(float deltaTime)
 {
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
-    if (mBossDrawComponent)
-    {
-        mBossDrawComponent->SetColor(mBossColor);
-    }
 }
 
 void Boss::UpdateTelegraphing(float deltaTime)
@@ -328,20 +332,10 @@ void Boss::UpdateTelegraphing(float deltaTime)
             mTargetDirection = Vector2(0.0f, 1.0f); // Padrão
         }
     }
-    float blink = Math::Abs(Math::Sin(mStateTimer * 20.0f));
-    if (mBossDrawComponent)
-    {
-        mBossDrawComponent->SetColor(Vector3(1.0f, blink, blink));
-    }
 }
 
 void Boss::UpdateDashing(float deltaTime)
 {
-    // ... (código original do Dashing) ...
-    if (mBossDrawComponent)
-    {
-        mBossDrawComponent->SetColor(mBossColor);
-    }
     if (mRigidBodyComponent->GetVelocity().LengthSq() < 1.0f)
     {
         mRigidBodyComponent->SetVelocity(mTargetDirection * 800.0f);
@@ -436,12 +430,8 @@ void Boss::UpdateMineLayer(float deltaTime)
 
 void Boss::UpdateFireBeam(float deltaTime)
 {
-    // 1. Para de se mover e reseta a cor
+    // 1. Para de se mover
     mRigidBodyComponent->SetVelocity(Vector2::Zero);
-    if (mBossDrawComponent)
-    {
-        mBossDrawComponent->SetColor(mBossColor);
-    }
 
     // 2. Atira (só no primeiro frame deste estado)
     if (mTargetDirection.LengthSq() > 1e-4f) // Se a mira foi definida
@@ -449,5 +439,70 @@ void Boss::UpdateFireBeam(float deltaTime)
         GetGame()->SpawnProjectile(GetPosition(), mTargetDirection, 2000.0f, false, 50.0f); // Tiro rápido e forte!
         GetGame()->AddScreenShake(5.0f, 0.1f);
         mTargetDirection = Vector2::Zero; // Reseta a mira
+    }
+}
+
+void Boss::UpdateAnimation(Vector2& directionToPlayer)
+{
+    float absX = fabs(directionToPlayer.x);
+    float absY = fabs(directionToPlayer.y);
+    
+    BossDirection newDirection = mCurrentDirection;
+    
+    if (absY > absX)
+    {
+        if (directionToPlayer.y < 0.0f)
+        {
+            newDirection = BossDirection::Back;
+            mAnimatorComponent->SetAnimation("Back");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+        else
+        {
+            newDirection = BossDirection::Front;
+            mAnimatorComponent->SetAnimation("Front");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+    }
+    else
+    {
+        if (directionToPlayer.x > 0.0f)
+        {
+            newDirection = BossDirection::Right;
+            mAnimatorComponent->SetAnimation("Right");
+            SetScale(Vector2(-1.0f, -1.0f));
+        }
+        else
+        {
+            newDirection = BossDirection::Left;
+            mAnimatorComponent->SetAnimation("Left");
+            SetScale(Vector2(1.0f, -1.0f));
+        }
+    }
+    
+    mCurrentDirection = newDirection;
+}
+
+void Boss::ChasePlayer(float deltaTime)
+{
+    auto player = GetGame()->GetPlayer();
+    if (!player) return;
+
+    Vector2 playerPos = player->GetPosition();
+    Vector2 bossPos  = GetPosition();
+    Vector2 dir = playerPos - bossPos;
+
+    float distance = dir.Length();
+    if (distance > 0.01f)
+    {
+        dir.Normalize();
+        mRigidBodyComponent->SetVelocity(dir * mSpeed);
+        UpdateAnimation(dir);
+    }
+
+    if (distance <= (mCircleColliderComponent->GetRadius() + 15.0f))
+    {
+        player->TakeDamage(20.0f * deltaTime);
+        GetGame()->AddScreenShake(3.0f, 0.10f);
     }
 }

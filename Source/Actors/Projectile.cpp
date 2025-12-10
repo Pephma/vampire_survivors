@@ -4,7 +4,7 @@
 #include "../Actors/Player.h"
 #include "../Components/CircleColliderComponent.h"
 #include "../Components/RigidBodyComponent.h"
-#include "../Components/DrawComponent.h"
+#include "../Components/AnimatorComponent.h"
 #include "../Math.h"
 
 Projectile::Projectile(class Game* game,
@@ -29,6 +29,7 @@ Projectile::Projectile(class Game* game,
     , mExplosionRadius(80.0f)
 {
     SetPosition(position);
+    SetScale(Vector2(1.0f, -1.0f));
     
     // Normalize direction
     if (mDirection.LengthSq() > 0.0f)
@@ -40,39 +41,18 @@ Projectile::Projectile(class Game* game,
         mDirection = Vector2(1.0f, 0.0f);  // Default direction
     }
 
-    // Create small circular projectile with better visuals
-    std::vector<Vector2> vertices;
-    float radius = 6.0f;  // Slightly larger for better visibility
-    int numVertices = 16;  // More vertices for smoother circle
-    for (int i = 0; i < numVertices; ++i)
-    {
-        float angle = (Math::TwoPi / numVertices) * i;
-        vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
-    }
-
-    mDrawComponent = new DrawComponent(this, vertices);
-
-    // Cor diferente por origem (feedback visual) - brighter colors
-    Vector3 projectileColor = mFromPlayer
-        ? Vector3(0.1f, 0.95f, 1.0f)   // player: brighter cyan
-        : Vector3(1.0f, 0.4f, 0.1f);  // inimigo: brighter orange
+    mAnimatorComponent = new AnimatorComponent(this,
+        "../Assets/Sprites/Shot/Shot.png",
+        "../Assets/Sprites/Shot/Shot.json",
+        16,
+        16
+    );
     
-    // Make explosive projectiles more visible
-    if (mExplosive)
-    {
-        projectileColor = Vector3(1.0f, 0.5f, 0.0f);  // Brighter red-orange
-        radius = 7.0f;  // Larger explosive projectiles
-    }
-    
-    // Make homing projectiles glow
-    if (mHoming)
-    {
-        projectileColor = Vector3(0.8f, 0.2f, 1.0f);  // Purple glow for homing
-    }
-    
-    mDrawComponent->SetColor(projectileColor);
-    mDrawComponent->SetFilled(true);
+    mAnimatorComponent->AddAnimation("shot", {0});
+    mAnimatorComponent->SetAnimation("shot");
+    mAnimatorComponent->SetAnimFPS(0.0f);
 
+    float radius = 8.0f;
     mRigidBodyComponent = new RigidBodyComponent(this, 0.1f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
 

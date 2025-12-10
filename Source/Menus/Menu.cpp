@@ -143,12 +143,24 @@ void Menu::Draw(Renderer* renderer)
         
         Matrix4 btnMatrix = Matrix4::Identity;
         VertexArray btnVA(btnFloatArray.data(), static_cast<unsigned int>(btnVertices.size()), btnIndices.data(), static_cast<unsigned int>(btnIndices.size()));
-        Vector3 btnColor = isSelected ? Vector3(0.3f, 0.3f, 0.4f) : Vector3(0.2f, 0.2f, 0.3f);
+        Vector3 btnColor = isSelected ? Vector3(0.8f, 0.8f, 0.9f) : Vector3(0.6f, 0.6f, 0.7f);
         renderer->Draw(btnMatrix, &btnVA, btnColor);
         
-        // Draw text
         Vector2 textPos(item.position.x + 10.0f, item.position.y + item.size.y / 2.0f - 5.0f);
-        TextRenderer::DrawText(renderer, item.text, textPos, 1.5f, color);
+        Vector3 textColor = isSelected ? Vector3(1.0f, 1.0f, 0.0f) : Vector3(1.0f, 1.0f, 1.0f);
+        Vector3 outlineColor(0.0f, 0.0f, 0.0f);
+        
+        float outlineSize = 2.0f;
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x - outlineSize, textPos.y), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x + outlineSize, textPos.y), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x, textPos.y - outlineSize), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x, textPos.y + outlineSize), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x - outlineSize, textPos.y - outlineSize), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x + outlineSize, textPos.y - outlineSize), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x - outlineSize, textPos.y + outlineSize), 1.5f, outlineColor);
+        TextRenderer::DrawText(renderer, item.text, Vector2(textPos.x + outlineSize, textPos.y + outlineSize), 1.5f, outlineColor);
+        
+        TextRenderer::DrawText(renderer, item.text, textPos, 1.5f, textColor);
     }
 }
 

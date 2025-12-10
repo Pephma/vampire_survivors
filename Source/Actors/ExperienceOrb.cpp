@@ -3,7 +3,7 @@
 #include "../Actors/Player.h"
 #include "../Components/CircleColliderComponent.h"
 #include "../Components/RigidBodyComponent.h"
-#include "../Components/DrawComponent.h"
+#include "../Components/AnimatorComponent.h"
 #include "../Math.h"
 #include "../Random.h"
 
@@ -15,21 +15,20 @@ ExperienceOrb::ExperienceOrb(class Game* game, const Vector2& position, float ex
     , mCollected(false)
 {
     SetPosition(position);
+    SetScale(Vector2(1.0f, -1.0f));
     
-    // Create circular orb
-    std::vector<Vector2> vertices;
+    mAnimatorComponent = new AnimatorComponent(this,
+        "../Assets/Sprites/Xp/xp.png",
+        "../Assets/Sprites/Xp/xp.json",
+        16,  
+        16   
+    );
+    
+    mAnimatorComponent->AddAnimation("idle", {0});
+    mAnimatorComponent->SetAnimation("idle");
+    mAnimatorComponent->SetAnimFPS(0.0f);
+
     float radius = 8.0f;
-    int numVertices = 16;
-    for (int i = 0; i < numVertices; ++i)
-    {
-        float angle = (Math::TwoPi / numVertices) * i;
-        vertices.emplace_back(Vector2(Math::Cos(angle) * radius, Math::Sin(angle) * radius));
-    }
-
-    mDrawComponent = new DrawComponent(this, vertices);
-    mDrawComponent->SetColor(Vector3(0.2f, 0.8f, 1.0f));  // Cyan/blue color
-    mDrawComponent->SetFilled(true);
-
     mRigidBodyComponent = new RigidBodyComponent(this, 0.1f);
     mCircleColliderComponent = new CircleColliderComponent(this, radius);
     
@@ -47,7 +46,7 @@ ExperienceOrb::~ExperienceOrb()
     
     // Clear component pointers to prevent any dangling references
     // Components are deleted by Actor destructor, but clear pointers just in case
-    mDrawComponent = nullptr;
+    mAnimatorComponent = nullptr;
     mCircleColliderComponent = nullptr;
     mRigidBodyComponent = nullptr;
 }

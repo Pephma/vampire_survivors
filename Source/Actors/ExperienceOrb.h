@@ -19,7 +19,7 @@ private:
     float mFloatPhase;
     bool mCollected;
     
-    class DrawComponent* mDrawComponent;
+    class AnimatorComponent* mAnimatorComponent;
     class CircleColliderComponent* mCircleColliderComponent;
     class RigidBodyComponent* mRigidBodyComponent;
 };

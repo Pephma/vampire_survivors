@@ -9,5 +9,6 @@ public:
 
 private:
     bool mMusicStarted;
+    class Texture* mBackgroundTexture;
 };
 

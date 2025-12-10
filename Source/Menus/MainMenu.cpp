@@ -3,12 +3,15 @@
 #include "../Renderer/Renderer.h"
 #include "../Renderer/VertexArray.h"
 #include "../Renderer/TextRenderer.h"
+#include "../Renderer/Texture.h"
 #include "../Components/DrawComponent.h"
 
 MainMenu::MainMenu(Game* game)
     : Menu(game)
     , mMusicStarted(false)
+    , mBackgroundTexture(nullptr)
 {
+    mBackgroundTexture = game->GetRenderer()->GetTexture("../Assets/Menu/menu_background.png");
     MenuItem startItem;
     startItem.text = "Start Game";
     startItem.position = Vector2(static_cast<float>(Game::WINDOW_WIDTH) / 2.0f - 100.0f, static_cast<float>(Game::WINDOW_HEIGHT) / 2.0f);
@@ -37,6 +40,21 @@ void MainMenu::Draw(Renderer* renderer)
             mGame->GetAudioSystem()->PlayMusic("menu", -1);
             mMusicStarted = true;
         }
+    }
+
+    if (mBackgroundTexture)
+    {
+        Vector4 flippedRect(0.0f, 1.0f, 1.0f, -1.0f);
+        renderer->DrawTexture(Vector2(0.0f, 0.0f),
+                            Vector2(static_cast<float>(Game::WINDOW_WIDTH), 
+                                   static_cast<float>(Game::WINDOW_HEIGHT)),
+                            0.0f,
+                            Vector3(1.0f, 1.0f, 1.0f),
+                            mBackgroundTexture,
+                            flippedRect,
+                            Vector2::Zero,
+                            false,
+                            1.0f);
     }
 
     Menu::Draw(renderer);
