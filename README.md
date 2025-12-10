@@ -1,5 +1,6 @@
 # Foge, Sô!
-
+## Gameplay
+https://youtu.be/6laHlw_SOrw
 ## Descrição
 
 **Foge, Sô!** é um jogo de ação e sobrevivência no estilo *roguelite / bullet hell*, fortemente inspirado em clássicos do gênero como *Vampire Survivors*. O jogador assume o controle de um personagem que deve resistir a hordas incessantes de inimigos em uma arena aberta. O objetivo central é sobreviver através de ondas temporais, coletando experiência deixada pelos oponentes derrotados para se fortalecer e enfrentar desafios de dificuldade progressiva.
