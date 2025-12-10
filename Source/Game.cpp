@@ -212,7 +212,11 @@ void Game::UpdateGame()
     {
         UpdateActors(deltaTime);
         UpdateWaveSystem(deltaTime);
-        if (mPlayer && mPlayer->GetHealth() > 0.0f)
+        if (mPlayer && mPlayer->GetHealth() <= 0.0f)
+        {
+            GameOver();
+        }
+        if (mPlayer)
         {
             UpdateCamera(deltaTime);
         }
@@ -243,7 +247,7 @@ void Game::UpdateActors(float deltaTime)
     {
         return;
     }
-    
+
     // Cap deltaTime to prevent huge jumps that could cause issues
     if (deltaTime > 0.033f)  // Cap at ~30 FPS minimum
     {
@@ -280,7 +284,7 @@ void Game::UpdateActors(float deltaTime)
         {
             break;
         }
-        
+
         // Safety checks
         if (!actor) continue;
 
@@ -899,7 +903,7 @@ void Game::SpawnEnemyOfKind(EnemyKind kind, int count)
         spawnPos.y = Math::Clamp(spawnPos.y, radius, (float)WORLD_HEIGHT - radius);
 
         // Atributos base que escalam com a wave - Spectacular progression
-        float baseHealth = 20.0f + mCurrentWave * 4.0f;  // Balanced health scaling (slightly easier early)
+        float baseHealth = 20.0f + mCurrentWave * 6.0f;  // Balanced health scaling (slightly easier early)
         float baseSpeed  = 85.0f + mCurrentWave * 2.5f;  // Moderate speed scaling
         float baseRadius = 12.0f + mCurrentWave * 0.2f;  // Slow size growth
 
@@ -910,14 +914,14 @@ void Game::SpawnEnemyOfKind(EnemyKind kind, int count)
         {
             case EnemyKind::Comum:
                 e->SetColor(Vector3(0.9f, 0.1f, 0.1f));
-                e->SetDamage(8.0f);  // Reduced for better balance
+                e->SetDamage(8.0f + mCurrentWave*8.0f);  // Reduced for better balance
                 e->SetExperienceValue(8.0f + mCurrentWave * 0.5f);  // Scales with wave
                 break;
 
             case EnemyKind::Corredor:
                 e->SetColor(Vector3(1.0f, 0.5f, 0.2f));
                 e->SetSpeed(280.0f);  // Faster for more challenge
-                e->SetDamage(5.0f);  // Less damage but faster
+                e->SetDamage(5.0f + mCurrentWave*5.0f);  // Less damage but faster
                 e->SetExperienceValue(10.0f + mCurrentWave * 0.5f);
                 break;
 
